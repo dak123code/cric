@@ -64,7 +64,9 @@ const CARD_TYPE_META: Record<CardType, { label: string; color: string; bg: strin
   prime:  { label: "Prime",         color: "#fbbf24", bg: "rgba(80,50,0,0.3)",    border: "rgba(245,158,11,0.5)" },
   mw:     { label: "Match Winner",  color: "#fca5a5", bg: "rgba(80,8,8,0.4)",     border: "rgba(239,68,68,0.5)" },
   totw:   { label: "Team of Week",  color: "#93c5fd", bg: "rgba(26,79,216,0.3)",  border: "rgba(96,165,250,0.5)" },
-  normal: { label: "Normal",        color: "#94a3b8", bg: "rgba(30,30,40,0.3)",   border: "rgba(100,116,139,0.4)" },
+  normal:   { label: "Normal",       color: "#94a3b8", bg: "rgba(30,30,40,0.3)",   border: "rgba(100,116,139,0.4)" },
+  "mw-icon": { label: "MW Icon",     color: "#fecdd3", bg: "rgba(76,5,25,0.4)",    border: "rgba(244,63,94,0.5)" },
+  bazball:  { label: "Bazball",      color: "#a7f3d0", bg: "rgba(2,44,34,0.4)",    border: "rgba(16,185,129,0.5)" },
 };
 
 const ROLE_COLORS: Record<string, string> = {

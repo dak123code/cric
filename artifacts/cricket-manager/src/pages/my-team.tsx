@@ -56,6 +56,8 @@ const BADGE_COLORS: Record<CardType, { bg: string; border: string; ratingColor: 
   prime:   { bg: "#3d2a00", border: "#f59e0b", ratingColor: "#fde68a", glow: "rgba(245,158,11,0.55)" },
   icon:    { bg: "#2d0050", border: "#a855f7", ratingColor: "#e879f9", glow: "rgba(168,85,247,0.6)" },
   mw:      { bg: "#7f1d1d", border: "#ef4444", ratingColor: "#fed7aa", glow: "rgba(239,68,68,0.6)" },
+  "mw-icon": { bg: "#4c0519", border: "#f43f5e", ratingColor: "#fecdd3", glow: "rgba(244,63,94,0.6)" },
+  bazball: { bg: "#022c22", border: "#10b981", ratingColor: "#a7f3d0", glow: "rgba(16,185,129,0.6)" },
 };
 
 function PitchBadge({

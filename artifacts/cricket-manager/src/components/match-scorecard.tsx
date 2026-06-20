@@ -45,11 +45,11 @@ export function MatchScorecard({ result, onDone }: { result: MatchResult, onDone
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <Card className="max-h-[500px] overflow-y-auto custom-scrollbar">
               <div className="p-4 space-y-1">
-                {result.innings2.ballByBall.slice().reverse().map((b, i) => (
+                {result.innings2.ballByBall.slice().reverse().map((b: BallEvent, i: number) => (
                   <BallRow key={`i2-${i}`} ball={b} />
                 ))}
                 <div className="py-4 text-center text-muted-foreground font-display font-bold tracking-widest text-sm border-y border-border/50 my-2">END OF INNINGS 1</div>
-                {result.innings1.ballByBall.slice().reverse().map((b, i) => (
+                {result.innings1.ballByBall.slice().reverse().map((b: BallEvent, i: number) => (
                   <BallRow key={`i1-${i}`} ball={b} />
                 ))}
               </div>

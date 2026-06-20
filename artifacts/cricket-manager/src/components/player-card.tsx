@@ -43,9 +43,10 @@ interface PlayerCardProps {
 export function PlayerCard({ player, action, onAction, inXI, disabled, compact }: PlayerCardProps) {
   const roleStyle = roleStyles[player.role as keyof typeof roleStyles] || 'text-muted bg-muted/10 border-muted/20';
 
-  const bat = player.battingRating ?? 0;
-  const bowl = (player.bowlingRating ?? 0) * 10;
-  const keep = (player.keepingRating ?? 0) * 10;
+  const fullPlayer = 'battingRating' in player ? player : null;
+  const bat = fullPlayer?.battingRating ?? 0;
+  const bowl = (fullPlayer?.bowlingRating ?? 0) * 10;
+  const keep = (fullPlayer?.keepingRating ?? 0) * 10;
   const role = player.role;
 
   // Primary stat: batting for bat/wk/ar, bowling for pure bowlers
