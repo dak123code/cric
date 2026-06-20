@@ -1,0 +1,562 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: Cricket Manager API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: game
+    description: Game operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /game/players/pool:
+    get:
+      operationId: getPlayerPool
+      tags: [game]
+      summary: Get a random pool of players for draft
+      parameters:
+        - name: count
+          in: query
+          schema:
+            type: integer
+            default: 30
+      responses:
+        "200":
+          description: Pool of players
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerPoolResponse"
+
+  /game/simulate:
+    post:
+      operationId: simulateMatch
+      tags: [game]
+      summary: Simulate a cricket match
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SimulateMatchRequest"
+      responses:
+        "200":
+          description: Match result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchResult"
+
+  /game/countries:
+    get:
+      operationId: getCountries
+      tags: [game]
+      summary: Get list of countries with their squads
+      responses:
+        "200":
+          description: Countries list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CountriesResponse"
+
+  /game/ipl-teams:
+    get:
+      operationId: getIplTeams
+      tags: [game]
+      summary: Get IPL teams
+      responses:
+        "200":
+          description: IPL teams list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IplTeamsResponse"
+
+  /game/career:
+    post:
+      operationId: createCareer
+      tags: [game]
+      summary: Create a new career
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCareerRequest"
+      responses:
+        "200":
+          description: Career created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Career"
+
+  /game/career/{careerId}:
+    get:
+      operationId: getCareer
+      tags: [game]
+      summary: Get career by id
+      parameters:
+        - name: careerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Career data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Career"
+
+  /game/career/{careerId}/simulate-season:
+    post:
+      operationId: simulateSeason
+      tags: [game]
+      summary: Simulate a season match in career mode
+      parameters:
+        - name: careerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SimulateSeasonMatchRequest"
+      responses:
+        "200":
+          description: Season match result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeasonMatchResult"
+
+  /game/career/{careerId}/transfer:
+    post:
+      operationId: transferPlayer
+      tags: [game]
+      summary: Sign or release a player in career mode
+      parameters:
+        - name: careerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransferRequest"
+      responses:
+        "200":
+          description: Transfer result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransferResult"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    Player:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        role:
+          type: string
+          enum: [batsman, bowler, allrounder, wicketkeeper]
+        country:
+          type: string
+        battingRating:
+          type: integer
+        bowlingRating:
+          type: integer
+        keepingRating:
+          type: integer
+        overallRating:
+          type: integer
+        age:
+          type: integer
+        salary:
+          type: integer
+      required:
+        - id
+        - name
+        - role
+        - country
+        - battingRating
+        - bowlingRating
+        - keepingRating
+        - overallRating
+        - age
+        - salary
+
+    PlayerPoolResponse:
+      type: object
+      properties:
+        players:
+          type: array
+          items:
+            $ref: "#/components/schemas/Player"
+      required:
+        - players
+
+    SimulateMatchRequest:
+      type: object
+      properties:
+        team1:
+          type: array
+          items:
+            $ref: "#/components/schemas/Player"
+        team2:
+          type: array
+          items:
+            $ref: "#/components/schemas/Player"
+        team1Name:
+          type: string
+        team2Name:
+          type: string
+        format:
+          type: string
+          enum: [t20, odi, test]
+      required:
+        - team1
+        - team2
+        - team1Name
+        - team2Name
+        - format
+
+    BallEvent:
+      type: object
+      properties:
+        over:
+          type: integer
+        ball:
+          type: integer
+        runs:
+          type: integer
+        isWicket:
+          type: boolean
+        batsmanName:
+          type: string
+        bowlerName:
+          type: string
+        description:
+          type: string
+      required:
+        - over
+        - ball
+        - runs
+        - isWicket
+        - batsmanName
+        - bowlerName
+        - description
+
+    InningsResult:
+      type: object
+      properties:
+        teamName:
+          type: string
+        score:
+          type: integer
+        wickets:
+          type: integer
+        overs:
+          type: number
+        ballByBall:
+          type: array
+          items:
+            $ref: "#/components/schemas/BallEvent"
+        topScorer:
+          type: string
+        topScorerRuns:
+          type: integer
+        topBowler:
+          type: string
+        topBowlerWickets:
+          type: integer
+      required:
+        - teamName
+        - score
+        - wickets
+        - overs
+        - ballByBall
+        - topScorer
+        - topScorerRuns
+        - topBowler
+        - topBowlerWickets
+
+    MatchResult:
+      type: object
+      properties:
+        innings1:
+          $ref: "#/components/schemas/InningsResult"
+        innings2:
+          $ref: "#/components/schemas/InningsResult"
+        winner:
+          type: string
+        margin:
+          type: string
+        manOfTheMatch:
+          type: string
+      required:
+        - innings1
+        - innings2
+        - winner
+        - margin
+        - manOfTheMatch
+
+    Country:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        flag:
+          type: string
+        players:
+          type: array
+          items:
+            $ref: "#/components/schemas/Player"
+      required:
+        - id
+        - name
+        - flag
+        - players
+
+    CountriesResponse:
+      type: object
+      properties:
+        countries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Country"
+      required:
+        - countries
+
+    IplTeam:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        shortName:
+          type: string
+        color:
+          type: string
+      required:
+        - id
+        - name
+        - shortName
+        - color
+
+    IplTeamsResponse:
+      type: object
+      properties:
+        teams:
+          type: array
+          items:
+            $ref: "#/components/schemas/IplTeam"
+      required:
+        - teams
+
+    CreateCareerRequest:
+      type: object
+      properties:
+        managerName:
+          type: string
+        teamId:
+          type: string
+      required:
+        - managerName
+        - teamId
+
+    SeasonFixture:
+      type: object
+      properties:
+        matchNumber:
+          type: integer
+        opponent:
+          type: string
+        opponentShortName:
+          type: string
+        played:
+          type: boolean
+        won:
+          type: boolean
+        result:
+          type: string
+      required:
+        - matchNumber
+        - opponent
+        - opponentShortName
+        - played
+        - won
+        - result
+
+    CareerPlayer:
+      type: object
+      properties:
+        playerId:
+          type: integer
+        name:
+          type: string
+        role:
+          type: string
+        overallRating:
+          type: integer
+        salary:
+          type: integer
+        inSquad:
+          type: boolean
+        inXI:
+          type: boolean
+      required:
+        - playerId
+        - name
+        - role
+        - overallRating
+        - salary
+        - inSquad
+        - inXI
+
+    Career:
+      type: object
+      properties:
+        id:
+          type: integer
+        managerName:
+          type: string
+        teamId:
+          type: string
+        teamName:
+          type: string
+        season:
+          type: integer
+        budget:
+          type: integer
+        trophies:
+          type: integer
+        points:
+          type: integer
+        wins:
+          type: integer
+        losses:
+          type: integer
+        fixtures:
+          type: array
+          items:
+            $ref: "#/components/schemas/SeasonFixture"
+        squad:
+          type: array
+          items:
+            $ref: "#/components/schemas/CareerPlayer"
+        availablePlayers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Player"
+      required:
+        - id
+        - managerName
+        - teamId
+        - teamName
+        - season
+        - budget
+        - trophies
+        - points
+        - wins
+        - losses
+        - fixtures
+        - squad
+        - availablePlayers
+
+    SimulateSeasonMatchRequest:
+      type: object
+      properties:
+        matchNumber:
+          type: integer
+      required:
+        - matchNumber
+
+    SeasonMatchResult:
+      type: object
+      properties:
+        matchResult:
+          $ref: "#/components/schemas/MatchResult"
+        career:
+          $ref: "#/components/schemas/Career"
+        pointsEarned:
+          type: integer
+        seasonComplete:
+          type: boolean
+        qualified:
+          type: boolean
+      required:
+        - matchResult
+        - career
+        - pointsEarned
+        - seasonComplete
+        - qualified
+
+    TransferRequest:
+      type: object
+      properties:
+        action:
+          type: string
+          enum: [sign, release, setXI]
+        playerId:
+          type: integer
+        xi:
+          type: array
+          items:
+            type: integer
+      required:
+        - action
+
+    TransferResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        career:
+          $ref: "#/components/schemas/Career"
+      required:
+        - success
+        - message
+        - career

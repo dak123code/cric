@@ -1,0 +1,196 @@
+## NATIONAL TEAMS
+
+### India (IND)
+
+- Rohit Sharma (Batsman, Captain) - 78
+- Virat Kohli (Batsman) - 77
+- Shubman Gill (Batsman) - 72
+- KL Rahul (Batsman, Keeper) - 64
+- Rishabh Pant (Batsman, Keeper) - 68
+- Yashasvi Jaiswal (Batsman) - 75
+- Sanju Samson (Batsman, Keeper) - 64
+- Suryakumar Yadav (Batsman) - 82
+- Shreyas Iyer (Batsman) - 68
+- Tilak Varma (Batsman) - 77
+- Abhishek Sharma (All Rounder) - 91
+- Hardik Pandya (All Rounder) - 75
+- Ravindra Jadeja (All Rounder) - 78
+- Axar Patel (All Rounder) - 68
+- Jasprit Bumrah (Bowler) - 90
+- Mohammed Shami (Bowler) - 80
+- Mohammed Siraj (Bowler) - 72
+- Kuldeep Yadav (Bowler) - 73
+- Yuzvendra Chahal (Bowler) - 70
+- Arshdeep Singh (Bowler) - 68
+
+
+### Australia (AUS)
+
+- Pat Cummins (Bowler, Captain) - 85
+- Steve Smith (Batsman) - 82
+- Marnus Labuschagne (Batsman) - 64
+- Travis Head (Batsman) - 78
+- Usman Khawaja (Batsman) - 65
+- Mitchell Marsh (All Rounder) - 70
+- Glenn Maxwell (All Rounder) - 74
+- Alex Carey (Batsman, Keeper) - 55
+- David Warner (Batsman) - 75
+- Josh Inglis (Batsman, Keeper) - 58
+- Sam Konstas (Batsman) - 55
+- Matt Renshaw (Batsman) - 55
+- Mitchell Starc (Bowler) - 85
+- Josh Hazlewood (Bowler) - 80
+- Nathan Lyon (Bowler) - 75
+- Adam Zampa (Bowler) - 72
+- Cameron Green (All Rounder) - 68
+- Marcus Stoinis (All Rounder) - 65
+
+
+### England (ENG)
+
+- Ben Stokes (All Rounder, Captain) - 82
+- Joe Root (Batsman) - 90
+- Harry Brook (Batsman) - 77
+- Ben Duckett (Batsman) - 70
+- Zak Crawley (Batsman) - 58
+- Ollie Pope (Batsman, Keeper) - 63
+- Jos Buttler (Batsman, Keeper) - 76
+- Jonny Bairstow (Batsman, Keeper) - 68
+- Jamie Smith (Batsman, Keeper) - 62
+- Jacob Bethell (All Rounder) - 46
+- Liam Livingstone (All Rounder) - 65
+- Moeen Ali (All Rounder) - 62
+- James Anderson (Bowler) - 82
+- Stuart Broad (Bowler) - 78
+- Mark Wood (Bowler) - 75
+- Jofra Archer (Bowler) - 78
+- Chris Woakes (Bowler) - 72
+- Adil Rashid (Bowler) - 70
+
+
+### Pakistan (PAK)
+
+- Babar Azam (Batsman, Captain) - 72
+- Mohammad Rizwan (Batsman, Keeper) - 70
+- Fakhar Zaman (Batsman) - 59
+- Imam-ul-Haq (Batsman) - 55
+- Saim Ayub (Batsman) - 65
+- Saud Shakeel (Batsman) - 68
+- Sahibzada Farhan (Batsman) - 75
+- Shan Masood (Batsman) - 60
+- Agha Salman (All Rounder) - 55
+- Shadab Khan (All Rounder) - 62
+- Imad Wasim (All Rounder) - 58
+- Shaheen Afridi (Bowler) - 82
+- Naseem Shah (Bowler) - 75
+- Haris Rauf (Bowler) - 70
+- Mohammad Hasnain (Bowler) - 62
+- Abrar Ahmed (Bowler) - 68
+
+
+### New Zealand (NZ)
+
+- Kane Williamson (Batsman, Captain) - 66
+- Tom Latham (Batsman, Keeper) - 59
+- Devon Conway (Batsman) - 68
+- Daryl Mitchell (All Rounder) - 77
+- Rachin Ravindra (All Rounder) - 65
+- Glenn Phillips (Batsman, Keeper) - 62
+- Will Young (Batsman) - 58
+- Finn Allen (Batsman) - 54
+- Mark Chapman (Batsman) - 55
+- Mitchell Santner (All Rounder) - 60
+- Tim Southee (Bowler) - 75
+- Trent Boult (Bowler) - 78
+- Matt Henry (Bowler) - 78
+- Kyle Jamieson (Bowler) - 67
+- Lockie Ferguson (Bowler) - 70
+- Ish Sodhi (Bowler) - 58
+
+
+### South Africa (SA)
+
+- Temba Bavuma (Batsman, Captain) - 78
+- Aiden Markram (Batsman) - 59
+- Quinton de Kock (Batsman, Keeper) - 72
+- David Miller (Batsman) - 64
+- Tristan Stubbs (Batsman) - 67
+- Heinrich Klaasen (Batsman, Keeper) - 70
+- Ryan Rickleton (Batsman, Keeper) - 58
+- Tony de Zorzi (Batsman) - 62
+- Wiaan Mulder (All Rounder) - 55
+- Marco Jansen (All Rounder) - 68
+- Kagiso Rabada (Bowler) - 82
+- Anrich Nortje (Bowler) - 75
+- Lungi Ngidi (Bowler) - 70
+- Keshav Maharaj (Bowler) - 68
+- Tabraiz Shamsi (Bowler) - 65
+
+
+### Sri Lanka (SL)
+
+- Charith Asalanka (Batsman, Captain) - 65
+- Pathum Nissanka (Batsman) - 78
+- Kusal Mendis (Batsman, Keeper) - 62
+- Dinesh Chandimal (Batsman, Keeper) - 55
+- Dhananjaya de Silva (All Rounder) - 65
+- Kamindu Mendis (All Rounder) - 68
+- Wanindu Hasaranga (All Rounder) - 75
+- Dasun Shanaka (All Rounder) - 58
+- Angelo Mathews (All Rounder) - 60
+- Maheesh Theekshana (Bowler) - 70
+- Dilshan Madushanka (Bowler) - 65
+- Matheesha Pathirana (Bowler) - 72
+- Dushmantha Chameera (Bowler) - 62
+- Nuwan Thushara (Bowler) - 58
+
+
+### West Indies (WI)
+
+- Shai Hope (Batsman, Keeper, Captain) - 65
+- Brandon King (Batsman) - 60
+- Nicholas Pooran (Batsman, Keeper) - 68
+- Shimron Hetmyer (Batsman) - 62
+- Amir Jangoo (Batsman) - 55
+- Johnson Charles (Batsman) - 58
+- Sherfane Rutherford (All Rounder) - 55
+- Rovman Powell (All Rounder) - 60
+- Andre Russell (All Rounder) - 78
+- Jason Holder (All Rounder) - 65
+- Roston Chase (All Rounder) - 58
+- Alzarri Joseph (Bowler) - 70
+- Akeal Hosein (Bowler) - 82
+- Gudakesh Motie (Bowler) - 65
+- Jayden Seales (Bowler) - 60
+
+
+### Bangladesh (BAN)
+
+- Najmul Hossain Shanto (Batsman, Captain) - 62
+- Litton Das (Batsman, Keeper) - 58
+- Mushfiqur Rahim (Batsman, Keeper) - 55
+- Towhid Hridoy (Batsman) - 60
+- Tanzid Hasan (Batsman) - 55
+- Mahedi Hasan (All Rounder) - 52
+- Shakib Al Hasan (All Rounder) - 72
+- Mehidy Hasan Miraz (All Rounder) - 65
+- Taskin Ahmed (Bowler) - 68
+- Mustafizur Rahman (Bowler) - 70
+- Shoriful Islam (Bowler) - 58
+- Hasan Mahmud (Bowler) - 55
+
+
+### Afghanistan (AFG)
+
+- Rashid Khan (Bowler, Captain) - 88
+- Ibrahim Zadran (Batsman) - 65
+- Rahmanullah Gurbaz (Batsman, Keeper) - 68
+- Azmatullah Omarzai (All Rounder) - 62
+- Gulbadin Naib (All Rounder) - 55
+- Mohammad Nabi (All Rounder) - 65
+- Najibullah Zadran (Batsman) - 58
+- Hashmatullah Shahidi (Batsman) - 55
+- Fazalhaq Farooqi (Bowler) - 72
+- Naveen-ul-Haq (Bowler) - 68
+- Mujeeb Ur Rahman (Bowler) - 70
+- Noor Ahmad (Bowler) - 82

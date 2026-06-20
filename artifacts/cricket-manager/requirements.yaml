@@ -1,0 +1,19 @@
+packages:
+  "framer-motion": "For fluid UI animations, layout transitions, and page stagger effects"
+  "clsx": "For conditional class name merging"
+  "tailwind-merge": "For safely merging tailwind classes in UI components"
+
+images:
+  - path: "artifacts/cricket-manager/public/images/hero-stadium.png"
+    description: "Cinematic cricket stadium at night, dark green pitch, glowing floodlights, dramatic volumetric lighting, epic sporting atmosphere"
+    aspect_ratio: "16:9"
+  - path: "artifacts/cricket-manager/public/images/trophy.png"
+    description: "Gleaming golden championship cricket trophy, dark moody background with subtle floating sparks and smoke"
+    aspect_ratio: "1:1"
+  - path: "artifacts/cricket-manager/public/images/logo.png"
+    description: "Minimalist glowing geometric cricket bat and ball icon, neon gold on transparent background"
+    aspect_ratio: "1:1"
+
+notes:
+  - We will use the provided generated hooks from @workspace/api-client-react as specified in the implementation notes
+  - Utilizing framer-motion for highly polished, premium component transitions

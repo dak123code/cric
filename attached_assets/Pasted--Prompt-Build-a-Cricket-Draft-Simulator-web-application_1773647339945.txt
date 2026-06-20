@@ -1,0 +1,131 @@
+**Prompt:**
+
+Build a Cricket Draft Simulator web application using Next.js 15+ with TypeScript, Tailwind CSS, and shadcn/ui components. The app should have the following features:
+
+## Main Menu
+
+- Title screen with "Cricket Draft Simulator" heading
+- Three game mode buttons: "Quick Match", "Auction Mode", and "Tournament Mode"
+- Dark theme with card-based UI
+
+
+## Team Data
+
+Create two data files:
+
+1. **IPL Teams** - 10 teams (CSK, MI, RCB, KKR, DC, PBKS, RR, SRH, GT, LSG) each with 15-20 players categorized as batsmen, all-rounders, and bowlers. Each player has: name, role, rating (60-95), basePrice, and battingStyle/bowlingStyle.
+2. **National Teams** - 10 international teams (IND, AUS, ENG, PAK, NZ, SA, SL, WI, BAN, AFG) with realistic squads and ratings.
+
+
+## Quick Match Mode
+
+### Team Selection
+
+- Side-by-side grid showing National Teams section and IPL Teams section
+- Select Team 1 (highlighted in primary color) and Team 2 (highlighted in accent color)
+- Show "VS" display when both teams selected
+
+
+### Playing XI Selection
+
+- After team selection, each team picks their playing 11 from their squad
+- Grid of player cards showing name, role, and rating
+- "Auto Select Best XI" button that picks top 11 by rating
+- Progress indicator showing "Selected: X/11"
+
+
+### Toss Screen
+
+- "You won the toss!" message
+- Two large buttons: "Bat First" (with bat icon) and "Bowl First" (with target icon)
+- Descriptions explaining each choice
+
+
+### Batting Gameplay (Bowler's POV)
+
+Stadium view from behind the bowler featuring:
+
+- **Background**: Sky gradient, stadium stands with crowd pattern (alternating colored pixels), advertising boards, green outfield with grass stripe pattern
+- **Pitch**: Amber/tan colored strip with perspective, white crease lines
+- **Pink stumps** with bails at batsman's end
+- **Fielders**: 11 white dots positioned at slip cordon, gully, point, cover, mid-off, mid-on, midwicket, square leg, fine leg, plus wicketkeeper
+- **Batsman**: SVG figure in side-on stance with:
+
+- Blue helmet with grill (India style)
+- Blue jersey
+- White pads on bent legs
+- Bat raised high behind in backlift position
+- Arms holding bat with gloves
+- Animates bat swing based on shot direction (left/straight/right)
+
+
+
+- **Bowler**: Figure at bottom with run-up animation, bowling arm windmill action
+- **Ball**: Red circle that travels from bowler to batsman with shadow
+
+
+**Controls**:
+
+- Direction selector (left/straight/right buttons)
+- Timing indicator that fills up when ball is bowled - player must tap "SWING!" at the right moment
+- Shot timing affects result (perfect/good/early/late/miss)
+
+
+**Scoreboard**: Shows team name, score/wickets, overs, and target when chasing
+
+### Bowling Gameplay (User bowls to AI)
+
+- Same stadium view but user controls bowling
+- **Pitch target selector**: Draggable/tappable zone showing Short/Good/Full length areas and line (outside off/on stumps/down leg)
+- "BOWL!" button to deliver
+- AI batsman attempts shots with variable timing based on delivery difficulty
+- Good length balls are harder to hit, increase wicket chances
+
+
+### Results Screen
+
+- Shows both innings scores with "1st Innings" / "2nd Innings (Chasing)" labels
+- Win margin calculated correctly:
+
+- If batting first won: "wins by X runs"
+- If chasing team won: "wins by X wickets"
+
+
+
+- "Play Again" and "Main Menu" buttons
+
+
+## Auction Mode
+
+- Budget-based player auction system
+- Players appear one by one with base price
+- Bidding interface with increment buttons
+- Track remaining budget and squad composition
+
+
+## Tournament Mode
+
+- Multiple teams compete in league + knockout format
+- Points table tracking
+- Simulated matches with user's team playable
+
+
+## Technical Requirements
+
+- Use React state for all game logic
+- SVG-based player figures for smooth animations
+- CSS transitions for bat swings, ball flight, bowler run-up
+- Responsive design for mobile and desktop
+- shadcn/ui Button, Card components
+- Tailwind CSS for all styling
+- Dark mode with proper contrast
+
+
+## Color Scheme
+
+- Background: Dark slate/charcoal
+- Primary: Blue for user's team
+- Accent: Orange/amber for opponent
+- Success: Green for boundaries/wickets taken
+- Destructive: Red for getting out
+- Muted grays for secondary text
