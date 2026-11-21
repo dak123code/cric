@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence, animate as animateValue } from "framer-motion";
-import { StadiumScene } from "@/components/stadium-scene";
+import {
+  StadiumScene, FieldWorld, BatterFigure, BowlerFigure, FIELDERS, BAT_X, BAT_Y, HOME_CAM, VIEW_W, VIEW_H,
+  FIELD_CX, FIELD_CY, ROPE_RX, ROPE_RY, camTransform, distanceToRope, randomShotAngle, lerp, clamp01, easeOutCubic,
+} from "@/components/stadium-scene";
 import { getMatchSetup } from "@/lib/match-store";
 import { Button } from "@/components/shared";
 import { TossCutscene } from "@/components/toss-cutscene";
@@ -821,6 +824,7 @@ function MatchGame({
 
         if (isBoundary) {
           boundaryDoneRef.current = continueGame;
+          setShotDir(cpuShotDir); // so the cutscene goes where the CPU actually hit it
           setBoundaryType(outcome.runs === 4 ? "four" : "six");
         } else if (isFielding) {
           setTimeout(continueGame, 2700);
@@ -979,11 +983,11 @@ function MatchGame({
               </Button>
             ) : (
               <>
-                <Button variant="secondary" className="flex-1" onClick={() => navigate("/quick-match")}>
+                <Button variant="secondary" className="flex-1" onClick={() => navigate("/")}>
                   Main Menu
                 </Button>
-                <Button className="flex-1" onClick={() => navigate("/quick-match")}>
-                  Play Again
+                <Button className="flex-1" onClick={() => navigate(setup.returnTo ?? "/quick-match")}>
+                  {setup.returnLabel ?? "Play Again"}
                 </Button>
               </>
             )}
@@ -1021,6 +1025,9 @@ function MatchGame({
             type={boundaryType}
             shotDir={shotDir}
             onDone={() => { boundaryDoneRef.current?.(); }}
+            isUserBatting={isUserBatting}
+            batsmanSprite={batsmanSprite}
+            batterFrame={kohliFrame}
           />
         )}
       </AnimatePresence>
@@ -1722,67 +1729,84 @@ function ScorecardView({
 
 type ShotDirType = "leg" | "straight" | "off" | null;
 
-// BoundaryScene: slow zoom into the part of the pitch where the ball was hit.
-// The SVG field (matching StadiumScene proportions) is scaled up via CSS transform-origin
-// so the camera appears to push into the relevant boundary area.
+// Full-screen cutscene on the same stadium as the match view. It starts on the same
+// shot, then the camera follows the ball to the rope: over it on a six, into the crowd.
 function BoundaryScene({
   type,
   shotDir,
   onDone,
+  isUserBatting,
+  batsmanSprite,
+  batterFrame,
 }: {
   type: "four" | "six";
   shotDir: ShotDirType;
   onDone: () => void;
+  isUserBatting: boolean;
+  batsmanSprite: "kohli" | "root";
+  batterFrame: number;
 }) {
   const isSix = type === "six";
-  const BAT_X = 320;
-  const BAT_Y = 253; // BATSMAN_Y(268) - 15, matches StadiumScene ball-arrival point
 
   useEffect(() => {
     const t = setTimeout(onDone, 3100);
     return () => clearTimeout(t);
   }, [onDone]);
 
-  // fx/fy: SVG focal point (boundary rope, in viewBox 640×580 user coords).
-  // Zoom uses a pure SVG <g transform> so the focal mapping is exact regardless of
-  // screen aspect ratio — no CSS-vs-SVG coordinate confusion from preserveAspectRatio.
-  // bx/by: ball keyframes in SVG user coords.
-  //   Boundary ellipse: cx=320, cy=380, rx=310, ry=230.
-  //   All endpoints are ON or past that rope so the ball visibly crosses it.
-  const cfg: { fx: number; fy: number; scale: number; bx: number[]; by: number[] } = (() => {
-    if (!isSix) {
-      if (shotDir === "leg") return { fx: 12,  fy: 358, scale: 3.8, bx: [BAT_X, 12],        by: [BAT_Y, 358] };
-      if (shotDir === "off") return { fx: 628, fy: 358, scale: 3.8, bx: [BAT_X, 628],       by: [BAT_Y, 358] };
-      /* straight */         return { fx: 320, fy: 579, scale: 3.8, bx: [BAT_X, 320],       by: [BAT_Y, 579] };
-    } else {
-      if (shotDir === "leg") return { fx: 15,  fy: 195, scale: 3.2, bx: [BAT_X, 218, 15],  by: [BAT_Y, 145, 195] };
-      if (shotDir === "off") return { fx: 612, fy: 192, scale: 3.2, bx: [BAT_X, 432, 612], by: [BAT_Y, 130, 192] };
-      /* straight */         return { fx: 320, fy: 579, scale: 3.2, bx: [BAT_X, 320, 320], by: [BAT_Y, 380, 579] };
-    }
-  })();
-
-  const ballTimes = cfg.bx.length === 3 ? ([0, 0.45, 1] as const) : ([0, 1] as const);
-
-  const groupRef = useRef<SVGGElement>(null);
-  // SVG-coordinate zoom: place focal point (fx,fy) at SVG center (320,290) at scale s.
-  // translate(320,290) scale(s) translate(-fx,-fy)  — operates in SVG user units so the
-  // focal mapping is exact on every screen size regardless of preserveAspectRatio slice.
-  const mkT = (s: number) =>
-    `translate(320,290) scale(${s}) translate(${-cfg.fx},${-cfg.fy})`;
-
-  useEffect(() => {
-    const el = groupRef.current;
-    if (!el) return;
-    const s0 = cfg.scale * 0.90;
-    el.setAttribute("transform", mkT(s0));
-    const ctrls = animateValue(s0, cfg.scale, {
-      duration: 1.65,
-      ease: [0.22, 0.46, 0.45, 0.94],
-      onUpdate: (s) => el.setAttribute("transform", mkT(s)),
-    });
-    return () => ctrls.stop();
+  // Where it goes (a random angle within the chosen side) and who chases it — fixed per cutscene
+  const plan = useMemo(() => {
+    const deg = randomShotAngle(shotDir ?? "straight");
+    const { dx, dy, t } = distanceToRope(BAT_X, BAT_Y, deg, FIELD_CX, FIELD_CY, ROPE_RX, ROPE_RY);
+    const at = (k: number) => ({ x: BAT_X + dx * t * k, y: BAT_Y + dy * t * k });
+    const end = at(isSix ? 1.32 : 1.05);          // six lands in the crowd, four just over the rope
+    const rope = at(0.97);
+    const chaser = FIELDERS.filter(f => f.deep)
+      .reduce((a, b) => Math.abs(b.deg - deg) < Math.abs(a.deg - deg) ? b : a);
+    // Four: sprints and dives just short. Six: backs up to the rope and leaps as it goes over.
+    const stop = isSix ? rope : { x: lerp(rope.x, chaser.x, 0.15), y: lerp(rope.y, chaser.y, 0.15) };
+    // Camera ends on the ball for a four; between the rope and the crowd for a six
+    const focusEnd = isSix ? { x: lerp(rope.x, end.x, 0.45), y: lerp(rope.y, end.y, 0.45) } : end;
+    return { end, chaser, stop, focusEnd };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const camRef = useRef<SVGGElement>(null);
+  const ballRef = useRef<SVGCircleElement>(null);
+  const shadowRef = useRef<SVGEllipseElement>(null);
+
+  // One clock for ball + camera so the camera stays locked on the ball
+  useEffect(() => {
+    const cam = camRef.current;
+    if (!cam) return;
+    const DUR = isSix ? 1.65 : 1.5;
+    const sEnd = isSix ? 1.3 : 1.8;
+    const apply = (time: number) => {
+      const e = easeOutCubic(clamp01(time / DUR));
+      const gx = lerp(BAT_X, plan.end.x, e), gy = lerp(BAT_Y, plan.end.y, e);
+      const arc = isSix ? Math.sin(Math.PI * e) : 0;           // height of a lofted six
+      const ball = ballRef.current, shadow = shadowRef.current;
+      if (ball) {
+        ball.setAttribute("cx", gx.toFixed(1));
+        ball.setAttribute("cy", (gy - arc * 90).toFixed(1));
+        ball.setAttribute("r", (5 + arc * 4).toFixed(2));
+      }
+      if (shadow) { shadow.setAttribute("cx", gx.toFixed(1)); shadow.setAttribute("cy", gy.toFixed(1)); }
+
+      // Lock onto the ball almost at once, then ride with it
+      const lock = easeOutCubic(clamp01(time / 0.3));
+      const tx = lerp(BAT_X, plan.focusEnd.x, e), ty = lerp(BAT_Y, plan.focusEnd.y, e) - arc * 45;
+      const cx = lerp(HOME_CAM.x, tx, lock), cy = lerp(HOME_CAM.y, ty, lock);
+      // Pull back mid-flight to show the field rushing past, then settle on the rope
+      const s = lerp(HOME_CAM.s, sEnd, e) - 0.4 * Math.sin(Math.PI * e);
+      cam.setAttribute("transform", camTransform(cx, cy, s));
+    };
+    apply(0);
+    const ctrl = animateValue(0, DUR, { duration: DUR, ease: "linear", onUpdate: apply });
+    return () => ctrl.stop();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const { chaser, stop } = plan;
 
   return (
     <motion.div
@@ -1793,117 +1817,35 @@ function BoundaryScene({
       className="fixed inset-0 z-[80] overflow-hidden cursor-pointer select-none bg-black"
       onClick={onDone}
     >
-        <svg
-          viewBox="0 0 640 580"
-          className="w-full h-full"
-          preserveAspectRatio="xMidYMid slice"
-        >
-          <g ref={groupRef} transform={mkT(cfg.scale * 0.90)}>
-          <defs>
-            <linearGradient id="bsc-sky" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#0a1628" />
-              <stop offset="60%" stopColor="#1a2f55" />
-              <stop offset="100%" stopColor="#1e3d6e" />
-            </linearGradient>
-            <linearGradient id="bsc-grass" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#0d3d0d" />
-              <stop offset="100%" stopColor="#1a5c1a" />
-            </linearGradient>
-            <linearGradient id="bsc-pitch" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#b8974e" />
-              <stop offset="100%" stopColor="#c8a865" />
-            </linearGradient>
-          </defs>
+      <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="w-full h-full" preserveAspectRatio="xMidYMid slice">
+        <g ref={camRef} transform={camTransform(HOME_CAM.x, HOME_CAM.y, HOME_CAM.s)}>
+          <FieldWorld idp="bsc" hideFielder={chaser.id} />
+          <BatterFigure isUserBatting={isUserBatting} batsmanSprite={batsmanSprite} frame={batterFrame} />
+          <BowlerFigure frame={19} />
 
-          {/* Sky */}
-          <rect width="640" height="580" fill="url(#bsc-sky)" />
-
-          {/* Stars */}
-          {[[60,30],[120,20],[200,45],[300,15],[420,35],[520,25],[580,50],[80,70],[450,55],[350,40]].map(([x,y],i)=>(
-            <circle key={i} cx={x} cy={y} r={1} fill="white" opacity={0.6} />
-          ))}
-
-          {/* Floodlights */}
-          <ellipse cx="90" cy="85" rx="6" ry="6" fill="#ffffaa" opacity={0.9} />
-          <ellipse cx="550" cy="85" rx="6" ry="6" fill="#ffffaa" opacity={0.9} />
-          <line x1="90" y1="91" x2="90" y2="130" stroke="#888" strokeWidth="3" />
-          <line x1="550" y1="91" x2="550" y2="130" stroke="#888" strokeWidth="3" />
-          <ellipse cx="90" cy="88" rx="20" ry="8" fill="#ffffaa" opacity={0.12} />
-          <ellipse cx="550" cy="88" rx="20" ry="8" fill="#ffffaa" opacity={0.12} />
-
-          {/* Stands – Left */}
-          <polygon points="0,230 220,200 180,110 0,110" fill="#1a1a2e" />
-          {[130,148,165,183,200].flatMap((y,row) =>
-            Array.from({length:18}).map((_,i) => (
-              <circle key={`cl${row}${i}`} cx={10+i*11+(row%2)*5} cy={y} r={3.5}
-                fill={["#c0392b","#2980b9","#f1c40f","#27ae60","#8e44ad"][i%5]} opacity={0.7} />
-            ))
-          )}
-
-          {/* Stands – Right */}
-          <polygon points="640,230 420,200 460,110 640,110" fill="#1a1a2e" />
-          {[130,148,165,183,200].flatMap((y,row) =>
-            Array.from({length:18}).map((_,i) => (
-              <circle key={`cr${row}${i}`} cx={425+i*11+(row%2)*5} cy={y} r={3.5}
-                fill={["#e74c3c","#3498db","#f39c12","#2ecc71","#9b59b6"][i%5]} opacity={0.7} />
-            ))
-          )}
-
-          {/* Outfield */}
-          <ellipse cx="320" cy="380" rx="310" ry="230" fill="url(#bsc-grass)" />
-          {Array.from({length:8}).map((_,i)=>(
-            <ellipse key={i} cx="320" cy="380"
-              rx={310-i*34} ry={230-i*26}
-              fill="none" stroke="#1f5c1f" strokeWidth={12} opacity={0.3} />
-          ))}
-
-          {/* Boundary rope */}
-          <ellipse cx="320" cy="380" rx="310" ry="230"
-            fill="none" stroke="white" strokeWidth="2.5" opacity={0.7} />
-
-          {/* Pitch — proportional to StadiumScene (90 px at batting end, 128 px at bowling end) */}
-          <polygon points="275,240 365,240 384,540 256,540" fill="url(#bsc-pitch)" />
-
-          {/* Batting crease */}
-          <line x1="273" y1="268" x2="367" y2="268" stroke="white" strokeWidth="2" />
-          {/* Batting stumps */}
-          <line x1="312" y1="248" x2="312" y2="268" stroke="#ff6090" strokeWidth="3" />
-          <line x1="320" y1="246" x2="320" y2="268" stroke="#ff6090" strokeWidth="3" />
-          <line x1="328" y1="248" x2="328" y2="268" stroke="#ff6090" strokeWidth="3" />
-          <line x1="310" y1="248" x2="319" y2="246" stroke="#ff6090" strokeWidth="2" />
-          <line x1="317" y1="246" x2="330" y2="248" stroke="#ff6090" strokeWidth="2" />
-
-          {/* Bowling crease */}
-          <line x1="258" y1="505" x2="382" y2="505" stroke="white" strokeWidth="2" />
-          {/* Bowling stumps */}
-          <line x1="315" y1="505" x2="315" y2="524" stroke="#ff6090" strokeWidth="3" />
-          <line x1="320" y1="503" x2="320" y2="524" stroke="#ff6090" strokeWidth="3" />
-          <line x1="325" y1="505" x2="325" y2="524" stroke="#ff6090" strokeWidth="3" />
-          <line x1="313" y1="505" x2="322" y2="503" stroke="#ff6090" strokeWidth="2" />
-          <line x1="318" y1="503" x2="327" y2="505" stroke="#ff6090" strokeWidth="2" />
-
-          {/* Fielders — WK, 1st slip, Cover, Mid-wkt */}
-          {([
-            [320,158],[352,161],[490,368],[148,368],
-          ] as [number,number][]).map(([x,y],i)=>(
-            <circle key={i} cx={x} cy={y} r={5.5} fill="white" opacity={0.88} />
-          ))}
-
-          {/* Animated ball */}
-          <motion.circle
-            cx={BAT_X}
-            cy={BAT_Y}
-            r={6}
-            fill="#cc2200"
-            stroke="#ff5555"
-            strokeWidth={1.5}
-            style={{ filter: "drop-shadow(0 0 8px rgba(255,80,80,0.9))" }}
+          {/* The chasing fielder */}
+          <motion.ellipse
+            fill="white"
+            initial={{ cx: chaser.x, cy: chaser.y, rx: 6.5, ry: 6.5 }}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            animate={{ cx: cfg.bx, cy: cfg.by } as any}
-            transition={{ duration: 1.65, ease: "easeOut", times: ballTimes as unknown as number[] }}
+            animate={(isSix
+              ? { cx: [chaser.x, stop.x, stop.x, stop.x], cy: [chaser.y, stop.y, stop.y - 9, stop.y], rx: 6.5, ry: 6.5 }
+              : { cx: [chaser.x, stop.x, stop.x], cy: [chaser.y, stop.y, stop.y + 2], rx: [6.5, 6.5, 10.5], ry: [6.5, 6.5, 3.8] }) as any}
+            transition={isSix
+              ? { delay: 0.1, duration: 1.6, times: [0, 0.62, 0.8, 1], ease: "easeOut" }
+              : { delay: 0.1, duration: 1.45, times: [0, 0.85, 1], ease: "easeOut" }}
           />
-          </g>
-        </svg>
+
+          {/* Ball (and its shadow on the ground for a lofted six) — positioned by the effect */}
+          {isSix && <ellipse ref={shadowRef} cx={BAT_X} cy={BAT_Y} rx={5} ry={2} fill="rgba(0,0,0,0.45)" />}
+          <circle
+            ref={ballRef}
+            cx={BAT_X} cy={BAT_Y} r={5}
+            fill="#cc2200" stroke="#ff5555" strokeWidth={1.4}
+            style={{ filter: "drop-shadow(0 0 6px rgba(255,80,80,0.9))" }}
+          />
+        </g>
+      </svg>
 
       {/* Screen-space glow (stays fixed, not zoomed) */}
       <motion.div

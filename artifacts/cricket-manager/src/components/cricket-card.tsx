@@ -54,12 +54,28 @@ interface CricketCardProps {
   player: CardPlayer;
   cardType?: CardType;
   customRating?: number;
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
   onClick?: () => void;
   className?: string;
 }
 
 const SIZES = {
+  xs: {
+    card: "w-[100px] h-[141px]",
+    rating: "text-[18px]",
+    roleText: "text-[7px]",
+    icon: "text-[26px]",
+    flag: "text-[11px]",
+    name: "text-[8px]",
+    stat: "text-[7px]",
+    statLabel: "text-[5px]",
+    px: "px-1.5",
+    pt: "pt-1.5",
+    mx: "mx-1",
+    mb: "mb-1",
+    namePy: "py-[2px]",
+    statPy: "py-[1px]",
+  },
   sm: {
     card: "w-[130px] h-[184px]",
     rating: "text-[22px]",
@@ -112,6 +128,57 @@ const SIZES = {
 
 function r10(v: number) { return Math.min(99, Math.ceil(v / 10)); }
 
+/**
+ * Look for a normal (non-special) card, by its displayed rating. Splits match the
+ * game's Gold/Silver/Bronze packs and the "Gold (75+)" SBC rules.
+ */
+export type BaseTier = "gold" | "silver" | "bronze";
+export function baseTierFor(rating: number): BaseTier {
+  if (rating >= 75) return "gold";
+  if (rating >= 65) return "silver";
+  return "bronze";
+}
+
+interface BaseStyle {
+  bg: string; border: string; shadow: string; sheen: string;
+  rating: string; role: string;
+  plate: string; bar: string; barTop: string; stat: string; statLabel: string;
+}
+
+// Deliberately flat and muted (no stripes or glow) so special cards still stand out.
+const BASE_STYLE: Record<BaseTier, BaseStyle> = {
+  // 75+: antique champagne
+  gold: {
+    bg: "linear-gradient(160deg, #6e5d3a 0%, #5a4b2d 45%, #463a22 100%)",
+    border: "1.5px solid rgba(231,211,160,0.55)",
+    shadow: "shadow-[0_4px_18px_rgba(0,0,0,0.55)] hover:shadow-[0_6px_28px_rgba(231,211,160,0.3)]",
+    sheen: "rgba(255,240,205,0.14)",
+    rating: "text-[#f4e4b8]", role: "text-[#cdb47c]",
+    plate: "rgba(36,28,14,0.72)", bar: "rgba(36,28,14,0.55)", barTop: "1px solid rgba(231,211,160,0.2)",
+    stat: "text-[#f6ecd2]", statLabel: "text-[#bfa56e]",
+  },
+  // 65–74: cool pewter with ivory type
+  silver: {
+    bg: "linear-gradient(160deg, #5b6068 0%, #4a4e56 45%, #3a3d44 100%)",
+    border: "1.5px solid rgba(228,231,236,0.4)",
+    shadow: "shadow-[0_4px_18px_rgba(0,0,0,0.55)] hover:shadow-[0_6px_28px_rgba(228,231,236,0.2)]",
+    sheen: "rgba(255,255,255,0.1)",
+    rating: "text-[#f5f2ea]", role: "text-[#b9bec7]",
+    plate: "rgba(22,24,28,0.7)", bar: "rgba(22,24,28,0.5)", barTop: "1px solid rgba(228,231,236,0.15)",
+    stat: "text-[#f5f2ea]", statLabel: "text-[#a1a7b0]",
+  },
+  // Under 65: dark cocoa with clay type
+  bronze: {
+    bg: "linear-gradient(160deg, #4b3022 0%, #3b2519 45%, #2a1910 100%)",
+    border: "1.5px solid rgba(204,142,100,0.42)",
+    shadow: "shadow-[0_4px_18px_rgba(0,0,0,0.6)] hover:shadow-[0_6px_28px_rgba(204,142,100,0.22)]",
+    sheen: "rgba(255,220,190,0.08)",
+    rating: "text-[#ebb991]", role: "text-[#b98462]",
+    plate: "rgba(24,13,7,0.7)", bar: "rgba(24,13,7,0.5)", barTop: "1px solid rgba(204,142,100,0.18)",
+    stat: "text-[#f3dccb]", statLabel: "text-[#ad7c5c]",
+  },
+};
+
 function getStats(player: CardPlayer) {
   const bat = r10(player.battingRating);
   const bowl = r10(player.bowlingRating);
@@ -137,6 +204,7 @@ export function CricketCard({ player, cardType = "normal", customRating, size = 
   const isBazBall = cardType === "bazball";
 
   const rating = customRating !== undefined ? Math.ceil(customRating / 10) : r10(player.overallRating);
+  const base = cardType === "normal" ? BASE_STYLE[baseTierFor(rating)] : null;
   const s = SIZES[size];
   const stats = getStats(player);
 
@@ -151,6 +219,7 @@ export function CricketCard({ player, cardType = "normal", customRating, size = 
         : isMW    ? "shadow-[0_0_28px_rgba(220,38,38,0.65)] hover:shadow-[0_0_50px_rgba(239,68,68,0.95)]"
         : isMWIcon? "shadow-[0_0_40px_rgba(168,85,247,0.65),0_0_28px_rgba(220,38,38,0.55)] hover:shadow-[0_0_70px_rgba(168,85,247,0.95),0_0_50px_rgba(239,68,68,0.85)]"
         : isBazBall ? "shadow-[0_0_36px_rgba(34,197,94,0.55),0_0_18px_rgba(168,85,247,0.3)] hover:shadow-[0_0_60px_rgba(34,197,94,0.85),0_0_30px_rgba(168,85,247,0.45)]"
+        : base      ? base.shadow
         : "shadow-[0_4px_20px_rgba(0,0,0,0.6)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.8)]",
         s.card,
         className
@@ -163,6 +232,7 @@ export function CricketCard({ player, cardType = "normal", customRating, size = 
           : isMW    ? "linear-gradient(148deg, #3d0808 0%, #5c0f0f 25%, #400808 55%, #1a0202 100%)"
           : isMWIcon? "linear-gradient(148deg, #1a0030 0%, #2d0050 18%, #350012 38%, #200030 60%, #0d000f 100%)"
           : isBazBall ? "linear-gradient(148deg, #001a08 0%, #002d10 20%, #001a08 50%, #000e04 80%, #0d0020 100%)"
+          : base      ? base.bg
           : "linear-gradient(148deg, #26263a 0%, #19192b 30%, #1d1d2f 60%, #111120 100%)",
       }}
       onClick={onClick}
@@ -178,6 +248,7 @@ export function CricketCard({ player, cardType = "normal", customRating, size = 
             : isMW    ? "2px solid rgba(239,68,68,0.75)"
             : isMWIcon? "2px solid rgba(239,68,68,0.9)"
             : isBazBall ? "2px solid rgba(34,197,94,0.9)"
+            : base      ? base.border
             : "1.5px solid rgba(148,163,184,0.22)",
         }}
       />
@@ -277,6 +348,11 @@ export function CricketCard({ player, cardType = "normal", customRating, size = 
         </>
       )}
 
+      {/* Gold / silver / bronze: just a faint top sheen */}
+      {base && (
+        <div className="absolute top-0 left-0 right-0 h-1/3 pointer-events-none z-[1]" style={{ background: `radial-gradient(ellipse at 50% 0%, ${base.sheen} 0%, transparent 70%)` }} />
+      )}
+
       {/* Top bar */}
       <div className={cn("relative z-10 flex items-start justify-between", s.px, s.pt)}>
         <div className="flex flex-col items-start leading-none">
@@ -287,6 +363,7 @@ export function CricketCard({ player, cardType = "normal", customRating, size = 
             : isMW    ? "text-orange-300"
             : isMWIcon? "text-fuchsia-200"
             : isBazBall ? "text-green-200"
+            : base      ? base.rating
             : "text-white"
           )}>
             {rating}
@@ -298,6 +375,7 @@ export function CricketCard({ player, cardType = "normal", customRating, size = 
             : isMW    ? "text-red-300"
             : isMWIcon? "text-fuchsia-400"
             : isBazBall ? "text-green-400"
+            : base      ? base.role
             : "text-slate-400"
           )}>
             {ROLE_ABBREV[player.role] ?? "PLY"}
@@ -370,6 +448,7 @@ export function CricketCard({ player, cardType = "normal", customRating, size = 
             : isMW    ? "linear-gradient(135deg, rgba(127,29,29,0.95), rgba(185,28,28,0.88))"
             : isMWIcon? "linear-gradient(135deg, rgba(80,10,100,0.97), rgba(140,20,60,0.92))"
             : isBazBall ? "linear-gradient(135deg, rgba(5,46,22,0.97), rgba(20,83,45,0.92))"
+            : base      ? base.plate
             : "linear-gradient(135deg, rgba(15,23,42,0.95), rgba(30,41,59,0.88))",
         }}
       >
@@ -389,6 +468,7 @@ export function CricketCard({ player, cardType = "normal", customRating, size = 
             : isMW    ? "rgba(127,29,29,0.65)"
             : isMWIcon? "rgba(70,10,80,0.70)"
             : isBazBall ? "rgba(5,46,22,0.75)"
+            : base      ? base.bar
             : "rgba(15,23,42,0.82)",
           borderTop:
             isTOTW    ? "1px solid rgba(96,165,250,0.3)"
@@ -397,6 +477,7 @@ export function CricketCard({ player, cardType = "normal", customRating, size = 
             : isMW    ? "1px solid rgba(239,68,68,0.3)"
             : isMWIcon? "1px solid rgba(239,68,68,0.45)"
             : isBazBall ? "1px solid rgba(34,197,94,0.4)"
+            : base      ? base.barTop
             : "1px solid rgba(148,163,184,0.1)",
         }}
       >
@@ -409,6 +490,7 @@ export function CricketCard({ player, cardType = "normal", customRating, size = 
               : isMW    ? "text-orange-100"
               : isMWIcon? "text-fuchsia-100"
               : isBazBall ? "text-green-100"
+              : base      ? base.stat
               : "text-white"
             )}>
               {stat.v}
@@ -420,6 +502,7 @@ export function CricketCard({ player, cardType = "normal", customRating, size = 
               : isMW    ? "text-red-400"
               : isMWIcon? "text-fuchsia-400"
               : isBazBall ? "text-green-400"
+              : base      ? base.statLabel
               : "text-slate-500"
             )}>
               {stat.l}

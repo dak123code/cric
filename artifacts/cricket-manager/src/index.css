@@ -37,22 +37,22 @@
 
 :root {
   /* Dark Stadium Theme */
-  --background: 150 15% 6%;
+  --background: 150 13% 9%;
   --foreground: 150 10% 98%;
 
-  --card: 150 15% 9%;
+  --card: 150 13% 12%;
   --card-foreground: 150 10% 98%;
 
-  --popover: 150 15% 9%;
+  --popover: 150 13% 12%;
   --popover-foreground: 150 10% 98%;
 
   --primary: 45 100% 55%; /* Vibrant Gold */
   --primary-foreground: 150 30% 10%;
 
-  --secondary: 150 20% 15%;
+  --secondary: 150 18% 18%;
   --secondary-foreground: 150 10% 98%;
 
-  --muted: 150 10% 15%;
+  --muted: 150 10% 17%;
   --muted-foreground: 150 10% 65%;
 
   --accent: 142 70% 45%; /* Grass Green */
@@ -61,8 +61,8 @@
   --destructive: 0 80% 55%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 150 15% 16%;
-  --input: 150 15% 12%;
+  --border: 150 13% 19%;
+  --input: 150 13% 14%;
   --ring: 45 100% 55%;
 
   /* Role specific colors */

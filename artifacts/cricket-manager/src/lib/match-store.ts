@@ -16,6 +16,9 @@ export interface MatchSetup {
   fixtureIndex?: number;
   // 2-player pass-and-play: both teams use manual batting controls
   twoPlayer?: boolean;
+  // Where "Play Again" goes after the match (defaults to Quick Match)
+  returnTo?: string;
+  returnLabel?: string;
 }
 
 let current: MatchSetup | null = null;
