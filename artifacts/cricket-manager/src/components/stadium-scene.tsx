@@ -48,7 +48,7 @@ const BATSMAN_X = 320, BATSMAN_Y = CREASE_BAT;  // feet at the crease
 const BOWLER_X = 320, BOWLER_Y = 548;           // feet, at the end of the run-up
 export const BAT_X = 320, BAT_Y = BATSMAN_Y - 15;      // where bat meets ball
 // Keeper stands just to the off side of the batter so he isn't hidden behind the sprite
-export const KEEPER = { x: 382, y: 238 };
+export const KEEPER = { x: 343, y: 236 };
 
 // Sprites
 const B_W = 62, B_H = 88;
@@ -59,7 +59,7 @@ const R_W = 92, R_H = 128;
 const R_X = BATSMAN_X - R_W / 2, R_Y = BATSMAN_Y - R_H + 30;
 
 // Default camera: just bowler, keeper and batter in frame
-export const HOME_CAM = { x: 320, y: 380, s: 1.75 };
+export const HOME_CAM = { x: 320, y: 380, s: 1.65 };
 export const camTransform = (x: number, y: number, s: number) =>
   `translate(${VIEW_W / 2},${VIEW_H / 2}) scale(${s}) translate(${-x},${-y})`;
 const HOME_T = camTransform(HOME_CAM.x, HOME_CAM.y, HOME_CAM.s);
@@ -116,7 +116,9 @@ export const FIELDERS: Fielder[] = ([
 // ── Fielding play: where the ball goes, who fetches it, and the timeline ─────
 const REACH_BY_RUNS   = [0.14, 0.3, 0.62, 0.8];     // how far out the ball stops (of the way to the rope)
 const REACH_STRAIGHT  = [0, 0.55, 0.75, 0.86];      // straight hits have to get past the bowler first
-const BALL_TIME       = [0.5, 0.7, 0.95, 1.1];      // seconds to get there
+const PICK_TIME       = [0.6, 0.8, 1.05, 1.2];      // seconds from the bat to the fielder gathering it
+const ROLL_AT_PICK    = 0.7;                         // the ball is gathered while still rolling (70% of its natural roll)
+const REACT           = 0.1;                         // fielder's reaction before he sets off
 const FOLLOW_SCALE    = [1.55, 1.35, 1.05, 0.95];   // camera pulls back for longer hits
 
 interface Plan {
@@ -124,7 +126,8 @@ interface Plan {
   dest: { x: number; y: number };
   chaser: Fielder | null;    // null: the bowler fields it himself
   followScale: number;
-  tBall: number; tPick: number; tThrow0: number; tThrow1: number; tEnd: number;
+  roll: number;              // how much of its natural roll the ball has done when picked up
+  tPick: number; tThrow0: number; tThrow1: number; tEnd: number;
 }
 
 function makePlan(runs: number, dir: ShotDir): Plan {
@@ -140,12 +143,13 @@ function makePlan(runs: number, dir: ShotDir): Plan {
   const chaser = straight && r === 0
     ? null
     : pool.reduce((a, b) => Math.abs(b.deg - deg) < Math.abs(a.deg - deg) ? b : a);
-  const tBall = BALL_TIME[r];
-  const tPick = tBall + 0.15;
-  const tThrow0 = tPick + 0.1;
+  const tPick = PICK_TIME[r];
+  const tThrow0 = tPick + 0.12;
   const tThrow1 = tThrow0 + (r >= 2 ? 0.6 : 0.4);
   const tEnd = tThrow1 + 0.55;                       // ≤ 2.5s, inside the match's 2.7s wait
-  return { runs: r, dest, chaser, followScale: FOLLOW_SCALE[r], tBall, tPick, tThrow0, tThrow1, tEnd };
+  // The bowler lets a straight dot roll to his feet; a fielder attacks it while it's moving
+  const roll = chaser ? ROLL_AT_PICK : 1;
+  return { runs: r, dest, chaser, followScale: FOLLOW_SCALE[r], roll, tPick, tThrow0, tThrow1, tEnd };
 }
 
 export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -371,8 +375,13 @@ export function StadiumScene({
     if (!cam) return;
     if (!plan) { cam.setAttribute("transform", HOME_T); return; }
 
-    const { dest, chaser, followScale, tBall, tPick, tThrow0, tThrow1, tEnd } = plan;
+    const { dest, chaser, followScale, roll, tPick, tThrow0, tThrow1, tEnd } = plan;
     const midScale = (followScale + HOME_CAM.s) / 2;
+    const easeOutQuad = (x: number) => 1 - (1 - x) * (1 - x);
+    // The fielder carries on a stride past the pickup before throwing
+    const runDx = chaser ? dest.x - chaser.x : 0, runDy = chaser ? dest.y - chaser.y : 0;
+    const runLen = Math.hypot(runDx, runDy) || 1;
+    const release = chaser ? { x: dest.x + (runDx / runLen) * 7, y: dest.y + (runDy / runLen) * 7 } : dest;
     const place = (el: SVGCircleElement | null, x: number, y: number, show: boolean) => {
       if (!el) return;
       el.setAttribute("cx", x.toFixed(1));
@@ -381,39 +390,44 @@ export function StadiumScene({
     };
 
     const apply = (t: number) => {
-      // Ball runs out and slows down
-      const e = easeOutCubic(clamp01(t / tBall));
+      // Ball runs out and slows down, still rolling when the fielder gets to it
+      const e = easeOutQuad(roll * clamp01(t / tPick)) / easeOutQuad(roll);
       const bx = lerp(BAT_X, dest.x, e), by = lerp(BAT_Y, dest.y, e);
       place(ballRef.current, bx, by, t < tPick);
 
-      // Fielder runs to the ball, then jogs part of the way back after throwing
+      // Fielder sets off at the hit, meets the ball at full pace, then jogs part of the way back
       if (chaser) {
         let fx: number, fy: number;
         if (t < tPick) {
-          const k = easeInOut(clamp01((t - 0.08) / (tPick - 0.08)));
+          const p = clamp01((t - REACT) / (tPick - REACT));
+          const k = p * p * (2 - p);                       // quick build-up, still running at the pickup
           fx = lerp(chaser.x, dest.x, k); fy = lerp(chaser.y, dest.y, k);
+        } else if (t < tThrow0) {
+          const k = easeOutCubic(clamp01((t - tPick) / (tThrow0 - tPick)));
+          fx = lerp(dest.x, release.x, k); fy = lerp(dest.y, release.y, k);
         } else {
           const k = 0.6 * easeInOut(clamp01((t - tThrow0) / 0.9));
-          fx = lerp(dest.x, chaser.x, k); fy = lerp(dest.y, chaser.y, k);
+          fx = lerp(release.x, chaser.x, k); fy = lerp(release.y, chaser.y, k);
         }
         place(chaserRef.current, fx, fy, true);
       }
 
       // Throw back to the keeper
       const u = clamp01((t - tThrow0) / (tThrow1 - tThrow0));
-      place(throwRef.current, lerp(dest.x, KEEPER.x, u), lerp(dest.y, KEEPER.y, u), t >= tThrow0 && t <= tThrow1);
+      place(throwRef.current, lerp(release.x, KEEPER.x, u), lerp(release.y, KEEPER.y, u), t >= tThrow0 && t <= tThrow1);
 
       // Camera: chase the ball → hold on the pickup → follow the throw → settle back home
       let cx: number, cy: number, s: number;
       if (t < tPick) {
-        const k = easeInOut(clamp01(t / (tBall * 0.7)));
+        const k = easeInOut(clamp01(t / (tPick * 0.7)));
         cx = lerp(HOME_CAM.x, bx, k); cy = lerp(HOME_CAM.y, by, k);
         s = lerp(HOME_CAM.s, followScale, e);
       } else if (t < tThrow0) {
-        cx = dest.x; cy = dest.y; s = followScale;
+        const k = easeOutCubic(clamp01((t - tPick) / (tThrow0 - tPick)));
+        cx = lerp(dest.x, release.x, k); cy = lerp(dest.y, release.y, k); s = followScale;
       } else if (t < tThrow1) {
         const k = easeInOut(u);
-        cx = lerp(dest.x, KEEPER.x, k); cy = lerp(dest.y, KEEPER.y, k); s = lerp(followScale, midScale, k);
+        cx = lerp(release.x, KEEPER.x, k); cy = lerp(release.y, KEEPER.y, k); s = lerp(followScale, midScale, k);
       } else {
         const k = easeInOut(clamp01((t - tThrow1) / (tEnd - tThrow1)));
         cx = lerp(KEEPER.x, HOME_CAM.x, k); cy = lerp(KEEPER.y, HOME_CAM.y, k); s = lerp(midScale, HOME_CAM.s, k);
