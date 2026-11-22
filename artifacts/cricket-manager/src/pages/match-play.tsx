@@ -2,16 +2,44 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence, animate as animateValue } from "framer-motion";
 import {
-  StadiumScene, FieldWorld, BatterFigure, BowlerFigure, FIELDERS, BAT_X, BAT_Y, HOME_CAM, VIEW_W, VIEW_H,
+  StadiumScene, FieldWorld, BatterFigure, BattingStumps, ENDS, FIELDERS, BAT_X, BAT_Y, HOME_CAM, VIEW_W, VIEW_H,
   FIELD_CX, FIELD_CY, ROPE_RX, ROPE_RY, camTransform, distanceToRope, randomShotAngle, lerp, clamp01, easeOutCubic,
+  fieldedPlayMs, type DrawnBatter,
 } from "@/components/stadium-scene";
 import { getMatchSetup } from "@/lib/match-store";
 import { Button } from "@/components/shared";
 import { TossCutscene } from "@/components/toss-cutscene";
-import type { Player as StaticPlayer } from "@/lib/static-data";
+import { shotWhenBowledTo, shotForJoystick, type BatterPlay, type BatterKit, type BatterStyle } from "@/components/drawn-batter";
+import type { BatterLook } from "@/components/batters-running";
+import { DrawnBowler, DrawnKeeper, keeperSpot, earliestRelease, type BowlerLook, type BowlerPlay, type FielderLook } from "@/components/drawn-fielders";
+import { LEFT_HANDED_BATTERS, SPINNERS, LEFT_ARM_BOWLERS, type Player as StaticPlayer } from "@/lib/static-data";
 import type { Player } from "@workspace/api-client-react/src/generated/api.schemas";
 import { addCoins, MATCH_COIN_REWARDS, grantUnlock, hasUnlock, incrementWins, CAREER_COIN_REWARDS } from "@/lib/game-store";
 import { loadCareer, applyPlayedGame } from "@/lib/career-store";
+
+// Every batter is drawn: each country bats like one of its signature players, in its own kit
+const DRAWN_LOOKS: Record<string, { kit: BatterKit; style: BatterStyle }> = {
+  "australia": { kit: "aus", style: "smith" },
+  "new zealand": { kit: "nz", style: "latham" },
+  "south africa": { kit: "sa", style: "bavuma" },
+  "india": { kit: "ind", style: "kohli" },
+  "england": { kit: "eng", style: "root" },
+  "west indies": { kit: "wi", style: "gayle" },
+  "pakistan": { kit: "pak", style: "babar" },
+  "sri lanka": { kit: "sl", style: "sangakkara" },
+  "bangladesh": { kit: "ban", style: "mushfiqur" },
+  "afghanistan": { kit: "afg", style: "gurbaz" },
+  "ireland": { kit: "ire", style: "stirling" },
+  "zimbabwe": { kit: "zim", style: "raza" },
+  "netherlands": { kit: "ned", style: "edwards" },
+};
+const OTHER_LOOK = { kit: "neutral" as BatterKit, style: "generic" as BatterStyle };
+const drawnLookFor = (p?: { country?: string } | null) =>
+  p ? DRAWN_LOOKS[(p.country ?? "").toLowerCase()] ?? OTHER_LOOK : undefined;
+const isLefty = (p?: { name?: string } | null) => !!p?.name && LEFT_HANDED_BATTERS.has(p.name);
+/** Runs the batters actually run: a fielded 1, 2 or 3 (not boundaries, wickets or extras). */
+const runsToRun = (o: { runs: number; isWicket: boolean; isExtra: boolean }) =>
+  !o.isWicket && !o.isExtra && o.runs > 0 && o.runs < 4 ? o.runs : 0;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -33,25 +61,6 @@ const JOYSTICK_TO_SHOT: Record<JoystickDir, ShotDir> = {
   "straight": "straight",
 };
 
-// Joystick direction → Kohli frame sequence
-const JOYSTICK_FRAMES: Record<JoystickDir, number[]> = {
-  "bottom-left": [2, 3, 4],
-  "bottom-right": [8, 9, 10, 11],
-  "top-right": [5, 6, 7],
-  "top-left": [12, 13, 14, 15],
-  "straight": [16, 17, 18, 19],
-};
-
-// Root frame sequences (different shot animations)
-const ROOT_JOYSTICK_FRAMES: Record<JoystickDir, number[]> = {
-  "bottom-left": [5, 6, 7, 8],
-  "top-left": [1, 2, 3, 4],
-  "top-right": [12, 13, 14, 15, 16],
-  "bottom-right": [12, 13, 14, 15, 16],
-  "straight": [17, 18, 19],
-};
-
-const ROOT_TEAMS = new Set(["england", "australia", "south africa", "new zealand"]);
 
 interface BallOutcome {
   runs: number;
@@ -244,7 +253,7 @@ function timingFromPosition(pos: number, preset: DiffPreset): Timing {
   return "miss";
 }
 
-function initInnings(battingTeam: 1 | 2, squad: Player[]): InningsState {
+function initInnings(battingTeam: 1 | 2, squad: Player[], bowlingSquad: Player[]): InningsState {
   const ordered = sortBattingOrder(squad);
   return {
     battingTeam,
@@ -254,7 +263,8 @@ function initInnings(battingTeam: 1 | 2, squad: Player[]): InningsState {
     batsmanScores: ordered.map((_, i) => ({
       playerIdx: i, runs: 0, balls: 0, fours: 0, sixes: 0, out: false, outDesc: "",
     })),
-    bowlerScores: sortBowlingOrder(squad).map((pi) => ({
+    // The fielding side bowls (indexes into their squad)
+    bowlerScores: sortBowlingOrder(bowlingSquad).map((pi) => ({
       playerIdx: pi, overs: 0, balls: 0, runs: 0, wickets: 0,
     })),
     partnershipRuns: 0,
@@ -321,12 +331,17 @@ function MatchGame({
   } | null>(null);
   const [milestone, setMilestone] = useState<string | null>(null);
   const [showScorecard, setShowScorecard] = useState(false);
-  const [bowlerFrame, setBowlerFrame] = useState(1);
+  // The bowler's delivery: when he set off and when the ball leaves his hand
+  const [bowlerPlay, setBowlerPlay] = useState<BowlerPlay | null>(null);
+  const bowlerPlayRef = useRef<BowlerPlay | null>(null);
+  bowlerPlayRef.current = bowlerPlay;
   const [boundaryType, setBoundaryType] = useState<"four" | "six" | null>(null);
   const boundaryDoneRef = useRef<(() => void) | null>(null);
 
-  // Kohli animation state
-  const [kohliFrame, setKohliFrame] = useState(1);
+  // Drawn batters (Australia/New Zealand): the shot being played, timed to the ball
+  const [batterPlay, setBatterPlay] = useState<BatterPlay | null>(null);
+  // The pair at the crease stay where they were until the ball's dead (the strike can change on the result)
+  const [facing, setFacing] = useState<{ s: number; n: number } | null>(null);
   const [ballPing, setBallPing] = useState(false);
 
   // Fielding animation state
@@ -350,13 +365,29 @@ function MatchGame({
     ? true
     : (activeInn === 1 && userBatFirst) || (activeInn === 2 && !userBatFirst);
 
-  // Determine batsman sprite based on which team is batting
-  const battingTeamName = (() => {
-    if (activeInn === 1) return (inn1?.battingTeam === 1 ? setup.team1Name : setup.team2Name) ?? "";
-    return (inn2?.battingTeam === 1 ? setup.team1Name : setup.team2Name) ?? "";
-  })();
-  const batsmanSprite: "kohli" | "root" =
-    ROOT_TEAMS.has(battingTeamName.toLowerCase()) ? "root" : "kohli";
+
+  const battingSquadNow = currentInn ? (currentInn.battingTeam === 1 ? t1 : t2) : [];
+  const strikerNow = currentInn ? battingSquadNow[facing?.s ?? currentInn.strikerIdx] : undefined;
+  const nonStrikerNow = currentInn ? battingSquadNow[facing?.n ?? currentInn.nonStrikerIdx] : undefined;
+  const nonStrikerLookNow = drawnLookFor(nonStrikerNow);
+  // The fielding side's bowler (pace or spin, which arm) and wicketkeeper, in their own country's kit
+  const fieldingSquadNow = currentInn ? (currentInn.battingTeam === 1 ? t2 : t1) : [];
+  const bowlerEntryNow = currentInn?.bowlerScores[currentInn.currentBowlerIdx];
+  const bowlerNow = bowlerEntryNow ? fieldingSquadNow[bowlerEntryNow.playerIdx] : undefined;
+  const bowlerLook: BowlerLook | null = bowlerNow
+    ? { ...(drawnLookFor(bowlerNow) ?? OTHER_LOOK), kind: SPINNERS.has(bowlerNow.name) ? "spin" : "pace", leftArm: LEFT_ARM_BOWLERS.has(bowlerNow.name) }
+    : null;
+  const bowlerLookRef = useRef<BowlerLook | null>(null);
+  bowlerLookRef.current = bowlerLook;
+  const keeperNow = fieldingSquadNow.find(p => p.role === "wicketkeeper") ?? fieldingSquadNow[0];
+  const keeperLook: FielderLook | null = keeperNow ? drawnLookFor(keeperNow) ?? OTHER_LOOK : null;
+  const nonStrikerLook: BatterLook | null = nonStrikerNow && nonStrikerLookNow
+    ? { id: nonStrikerNow.name, ...nonStrikerLookNow, leftHanded: isLefty(nonStrikerNow) }
+    : null;
+  const strikerLook = drawnLookFor(strikerNow);
+  const drawnBatter: DrawnBatter | null = strikerLook
+    ? { id: strikerNow?.name ?? "", play: batterPlay, ready: isUserBatting && ballStep === "timing", ...strikerLook, leftHanded: isLefty(strikerNow) }
+    : null;
 
   // Which player label is currently batting (2P only)
   const activeBatter = is2P
@@ -564,7 +595,7 @@ function MatchGame({
     setUserBatFirst(batFirst);
     const firstBatTeam: 1 | 2 = batFirst ? 1 : 2;
     const firstBatSquad = firstBatTeam === 1 ? t1 : t2;
-    setInn1(initInnings(firstBatTeam, firstBatSquad));
+    setInn1(initInnings(firstBatTeam, firstBatSquad, firstBatTeam === 1 ? t2 : t1));
     setActiveInn(1);
     setPhase("match");
     setBallStep("idle");
@@ -578,6 +609,7 @@ function MatchGame({
     setJoystickDir(jDir);
     setShotDir(JOYSTICK_TO_SHOT[jDir]);
     setBallStep("timing");
+    setBowlerPlay({ mode: "user", runStartAt: performance.now(), releaseAt: null });
     startTimingBar();
   };
 
@@ -594,6 +626,7 @@ function MatchGame({
       const squad = currentInn.battingTeam === 1 ? t1 : t2;
       const opposingSquad = currentInn.battingTeam === 1 ? t2 : t1;
       const batsman = squad[currentInn.strikerIdx];
+      setFacing({ s: currentInn.strikerIdx, n: currentInn.nonStrikerIdx });
       const bowlerEntry = currentInn.bowlerScores[currentInn.currentBowlerIdx];
       const bowler = opposingSquad[bowlerEntry.playerIdx];
 
@@ -607,18 +640,18 @@ function MatchGame({
       );
 
       setBatAngle(timing === "miss" ? 0 : 55);
-      setBallActive(true);
+      // The ball leaves the bowler's hand just after the swing (once he's got to his gather)
+      const now = performance.now();
+      const bp = bowlerPlayRef.current, bk = bowlerLookRef.current?.kind;
+      const releaseAt = Math.max(now + 200, bp && bk ? earliestRelease(bk, bp.runStartAt) : 0);
+      const delay = releaseAt - now;
+      setBowlerPlay(prev => (prev ? { ...prev, releaseAt } : { mode: "user", runStartAt: now, releaseAt }));
+      if (drawnLookFor(batsman)) {
+        setBatterPlay({ shot: shotForJoystick(joystickDir, isLefty(batsman)), contactAt: releaseAt + 500, key: Date.now(), runs: runsToRun(outcome) });
+      }
+      setTimeout(() => setBallActive(true), delay);
       setBallStep("bowling_anim");
       setLastOutcome(outcome);
-
-      // Animate batsman frames based on joystick direction
-      if (joystickDir && timing !== "miss") {
-        const frameMap = batsmanSprite === "root" ? ROOT_JOYSTICK_FRAMES : JOYSTICK_FRAMES;
-        const frames = frameMap[joystickDir];
-        frames.forEach((frame, i) => {
-          setTimeout(() => setKohliFrame(frame), i * 130);
-        });
-      }
 
       setTimeout(() => {
         setBallActive(false);
@@ -662,7 +695,9 @@ function MatchGame({
         const continueGame = () => {
           setResultFlash(null);
           setBallPing(false);
-          setKohliFrame(1);
+          setBowlerPlay(null);
+          setBatterPlay(null);
+          setFacing(null);
           setBoundaryType(null);
           setFieldingAnim(null);
 
@@ -670,7 +705,7 @@ function MatchGame({
             if (activeInn === 1) {
               const secBatTeam: 1 | 2 = nextInn.battingTeam === 1 ? 2 : 1;
               const secSquad = secBatTeam === 1 ? t1 : t2;
-              setInn2(initInnings(secBatTeam, secSquad));
+              setInn2(initInnings(secBatTeam, secSquad, secBatTeam === 1 ? t2 : t1));
               setActiveInn(2);
               setBallStep("idle");
               setBowlStep("select_target");
@@ -693,11 +728,11 @@ function MatchGame({
           boundaryDoneRef.current = continueGame;
           setBoundaryType(outcome.runs === 4 ? "four" : "six");
         } else if (isFielding) {
-          setTimeout(continueGame, 2700); // wait for fielding animation (~2.6s)
+          setTimeout(continueGame, fieldedPlayMs(outcome.runs)); // fielding and running
         } else {
           setTimeout(continueGame, 800); // wickets / extras
         }
-      }, 500);
+      }, 500 + delay);
     },
     [timingPos, currentInn, shotDir, joystickDir, activeInn, inn1, t1, t2, applyOutcome, stopTiming, setCurrentInn]
   );
@@ -752,6 +787,7 @@ function MatchGame({
     const squad = currentInn.battingTeam === 1 ? t1 : t2;
     const opposingSquad = currentInn.battingTeam === 1 ? t2 : t1;
     const batsman = squad[currentInn.strikerIdx];
+    setFacing({ s: currentInn.strikerIdx, n: currentInn.nonStrikerIdx });
     const bowlerEntry = currentInn.bowlerScores[currentInn.currentBowlerIdx];
     const bowler = opposingSquad[bowlerEntry.playerIdx];
 
@@ -767,9 +803,12 @@ function MatchGame({
 
     // Animate all 19 run-up frames at 85ms each — slightly longer run-up
     const FRAME_MS = 85;
-    for (let i = 1; i <= 19; i++) {
-      setTimeout(() => setBowlerFrame(i), (i - 1) * FRAME_MS);
+    if (drawnLookFor(batsman)) {
+      const side: ShotDir = pLine === "off" ? "leg" : pLine === "leg" ? "off" : "straight";
+      // ball is released after the run-up and takes 0.52s to reach him
+      setBatterPlay({ shot: shotWhenBowledTo(side, pLen, outcome, isLefty(batsman)), contactAt: performance.now() + 19 * FRAME_MS + 520, key: Date.now(), runs: runsToRun(outcome) });
     }
+    setBowlerPlay({ mode: "auto", runStartAt: performance.now(), releaseAt: performance.now() + 19 * FRAME_MS });
 
     // After last frame, release the ball
     setTimeout(() => {
@@ -798,7 +837,9 @@ function MatchGame({
 
         const continueGame = () => {
           setResultFlash(null);
-          setBowlerFrame(1);
+          setBowlerPlay(null);
+          setBatterPlay(null);
+          setFacing(null);
           setPitchTarget(null);
           setBoundaryType(null);
           setFieldingAnim(null);
@@ -807,7 +848,7 @@ function MatchGame({
             if (activeInn === 1) {
               const secBatTeam: 1 | 2 = nextInn.battingTeam === 1 ? 2 : 1;
               const secSquad = secBatTeam === 1 ? t1 : t2;
-              setInn2(initInnings(secBatTeam, secSquad));
+              setInn2(initInnings(secBatTeam, secSquad, secBatTeam === 1 ? t2 : t1));
               setActiveInn(2);
               setBallStep("idle");
               setBowlStep("select_target");
@@ -827,7 +868,7 @@ function MatchGame({
           setShotDir(cpuShotDir); // so the cutscene goes where the CPU actually hit it
           setBoundaryType(outcome.runs === 4 ? "four" : "six");
         } else if (isFielding) {
-          setTimeout(continueGame, 2700);
+          setTimeout(continueGame, fieldedPlayMs(outcome.runs));
         } else {
           setTimeout(continueGame, 800);
         }
@@ -1025,9 +1066,9 @@ function MatchGame({
             type={boundaryType}
             shotDir={shotDir}
             onDone={() => { boundaryDoneRef.current?.(); }}
-            isUserBatting={isUserBatting}
-            batsmanSprite={batsmanSprite}
-            batterFrame={kohliFrame}
+            drawnBatter={drawnBatter}
+            bowlerLook={bowlerLook}
+            keeperLook={keeperLook}
           />
         )}
       </AnimatePresence>
@@ -1173,17 +1214,17 @@ function MatchGame({
             ballActive={ballActive}
             batAngle={batAngle}
             shotDirection={shotDir}
-            isUserBatting={isUserBatting}
             resultFlash={resultFlash}
-            kohliFrame={kohliFrame}
-            batsmanSprite={batsmanSprite}
             ballPing={ballPing}
-            bowlerFrame={bowlerFrame}
+            bowler={bowlerLook ? { look: bowlerLook, play: bowlerPlay, userMode: isUserBatting } : null}
+            keeper={keeperLook}
             bowlingMode={!isUserBatting && bowlStep === "select_target"}
             pitchTarget={pitchTarget}
             onPitchTarget={setPitchTarget}
             fieldingAnim={fieldingAnim}
             fieldingKey={fieldingKey}
+            drawnBatter={drawnBatter}
+            nonStriker={nonStrikerLook}
           />
         </motion.div>
 
@@ -1735,16 +1776,16 @@ function BoundaryScene({
   type,
   shotDir,
   onDone,
-  isUserBatting,
-  batsmanSprite,
-  batterFrame,
+  drawnBatter,
+  bowlerLook,
+  keeperLook,
 }: {
   type: "four" | "six";
   shotDir: ShotDirType;
   onDone: () => void;
-  isUserBatting: boolean;
-  batsmanSprite: "kohli" | "root";
-  batterFrame: number;
+  drawnBatter: DrawnBatter | null;
+  bowlerLook: BowlerLook | null;
+  keeperLook: FielderLook | null;
 }) {
   const isSix = type === "six";
 
@@ -1820,8 +1861,13 @@ function BoundaryScene({
       <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="w-full h-full" preserveAspectRatio="xMidYMid slice">
         <g ref={camRef} transform={camTransform(HOME_CAM.x, HOME_CAM.y, HOME_CAM.s)}>
           <FieldWorld idp="bsc" hideFielder={chaser.id} />
-          <BatterFigure isUserBatting={isUserBatting} batsmanSprite={batsmanSprite} frame={batterFrame} />
-          <BowlerFigure frame={19} />
+          {keeperLook && (
+            <DrawnKeeper look={keeperLook} standingUp={bowlerLook?.kind === "spin"} ends={ENDS} bowlerKind={bowlerLook?.kind ?? "pace"}
+              spot={keeperSpot(bowlerLook?.kind === "spin", drawnBatter?.leftHanded ?? false, ENDS)} play={null} userMode={false} />
+          )}
+          <BattingStumps />
+          <BatterFigure drawn={drawnBatter} />
+          {bowlerLook && <DrawnBowler look={bowlerLook} play={null} ends={ENDS} userMode={false} still={1.0} />}
 
           {/* The chasing fielder */}
           <motion.ellipse

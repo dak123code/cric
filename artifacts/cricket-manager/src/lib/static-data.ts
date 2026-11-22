@@ -646,6 +646,109 @@ export function getCountriesWithFullSquad() {
   ).map((c) => ({ ...c, players: buildCountryXI(c.id) }));
 }
 
+/** Left-handed batters: their drawn batter is mirrored. Anyone not listed bats right-handed. */
+export const LEFT_HANDED_BATTERS = new Set([
+  // Australia
+  "Alex Carey", "Ashton Agar", "Ben Dwarshuis", "Cooper Connolly", "D'Arcy Short", "David Warner",
+  "Jake Weatherald", "Josh Hazlewood", "Matthew Kuhnemann", "Matthew Wade", "Mitchell Starc",
+  "Phillip Hughes", "Sam Heazlett", "Todd Murphy", "Travis Head", "Usman Khawaja",
+  // New Zealand
+  "Ajaz Patel", "Devon Conway", "Henry Nicholls", "Jeet Raval", "Jimmy Neesham", "Michael Bracewell",
+  "Mitchell Santner", "Rachin Ravindra", "Tom Latham",
+  // South Africa
+  "Andile Phehlukwayo", "David Miller", "George Linde", "Kagiso Rabada", "Quinton de Kock", "Ryan Rickelton",
+  "Sarel Erwee", "Senuran Muthusamy", "Tony de Zorzi",
+  // India
+  "Abhinav Mukund", "Abhishek Sharma", "Arshdeep Singh", "Axar Patel", "Devdutt Padikkal", "Ishan Kishan",
+  "Nitish Rana", "Ravindra Jadeja", "Rinku Singh", "Rishabh Pant", "Sai Sudharsan", "Shahbaz Ahmed",
+  "Shikhar Dhawan", "Shivam Dube", "Suresh Raina", "Tilak Varma", "Vaibhav Suryavanshi", "Washington Sundar",
+  "Yashasvi Jaiswal",
+  // England
+  "Adam Lyth", "Alex Lees", "Ben Duckett", "Ben Stokes", "Dawid Malan", "Gary Ballance", "Jack Leach",
+  "Jacob Bethell", "James Anderson", "Keaton Jennings", "Mark Stoneman", "Moeen Ali", "Rory Burns",
+  "Sam Curran", "Scott Borthwick", "Stuart Broad", "Tom Hartley", "Zafar Ansari",
+  // Pakistan
+  "Faheem Ashraf", "Fakhar Zaman", "Haris Sohail", "Imad Wasim", "Imam-ul-Haq", "Mohammad Nawaz", "Saim Ayub",
+  "Saud Shakeel", "Shaheen Afridi", "Shaheen Shah Afridi", "Sharjeel Khan", "Zafar Gohar",
+  // West Indies
+  "Brian Lara", "Chris Gayle", "Nicholas Pooran", "Sherfane Rutherford", "Shimron Hetmyer",
+  // Sri Lanka
+  "Bhanuka Rajapaksa", "Charith Asalanka", "Dimuth Karunaratne", "Dunith Wellalage", "Kumar Sangakkara",
+  "Kusal Perera", "Milinda Siriwardana", "Niroshan Dickwella", "Prabath Jayasuriya", "Rangana Herath",
+  "Sachith Pathirana", "Shehan Jayasuriya", "Thisara Perera",
+  // Bangladesh
+  "Mohammad Naim", "Mustafizur Rahman", "Najmul Hossain Shanto", "Shadman Islam", "Shakib Al Hasan",
+  "Shoriful Islam", "Tamim Iqbal", "Zakir Hasan",
+  // Netherlands
+  "Vikramjit Singh",
+]);
+
+/** Spin bowlers (everyone else bowls pace). */
+export const SPINNERS = new Set([
+  // India
+  "Abhishek Sharma", "Amit Mishra", "Axar Patel", "Jayant Yadav", "Karn Sharma", "Kuldeep Yadav", "Pragyan Ojha",
+  "R. Ashwin", "Ramesh Powar", "Ravi Bishnoi", "Ravindra Jadeja", "Riyan Parag", "Shahbaz Ahmed", "Shahbaz Nadeem",
+  "Suresh Raina", "Varun Chakravarthy", "Washington Sundar", "Yuzvendra Chahal",
+  // Australia
+  "Adam Zampa", "Ashton Agar", "Cooper Connolly", "D'Arcy Short", "Fawad Ahmed", "Glenn Maxwell", "Matthew Kuhnemann",
+  "Mitchell Swepson", "Nathan Lyon", "Shane Warne", "Tanveer Sangha", "Todd Murphy",
+  // England
+  "Adil Rashid", "Dom Bess", "Jack Leach", "Jacob Bethell", "Joe Denly", "Liam Dawson", "Liam Livingstone", "Mason Crane",
+  "Matt Parkinson", "Moeen Ali", "Rehan Ahmed", "Samit Patel", "Scott Borthwick", "Shoaib Bashir", "Simon Kerrigan",
+  "Tom Hartley", "Will Jacks", "Zafar Ansari",
+  // Pakistan
+  "Abrar Ahmed", "Asif Afridi", "Bilal Asif", "Imad Wasim", "Mohammad Nawaz", "Noman Ali", "Sajid Khan", "Salman Agha",
+  "Shadab Khan", "Zafar Gohar", "Zahid Mahmood",
+  // New Zealand
+  "Ajaz Patel", "Glenn Phillips", "Ish Sodhi", "Michael Bracewell", "Mitchell Santner", "Rachin Ravindra", "Will Somerville",
+  // South Africa
+  "George Linde", "Keshav Maharaj", "Prenelan Subrayen", "Senuran Muthusamy", "Shaun von Berg", "Tabraiz Shamsi",
+  // West Indies
+  "Sunil Narine",
+  // Sri Lanka
+  "Akila Dananjaya", "Chaturanga de Silva", "Dhananjaya de Silva", "Dunith Wellalage", "Embuldeniya", "Hasaranga de Silva",
+  "Jeffrey Vandersay", "Lakshan Sandakan", "Maheesh Theekshana", "Malinga Bandara", "Milinda Siriwardana",
+  "Prabath Jayasuriya", "Pushpakumara", "Rangana Herath", "Sachith Pathirana", "Shehan Jayasuriya", "Wanindu Hasaranga",
+  // Bangladesh
+  "Hasan Murad", "Mahmudullah", "Mehidy Hasan Miraz", "Mosaddek Hossain", "Nayeem Hasan", "Nazmul Islam",
+  "Shakib Al Hasan", "Sunzamul Islam",
+  // Afghanistan
+  "Mohammad Nabi", "Mujeeb Ur Rahman", "Noor Ahmad", "Rashid Khan",
+  // Zimbabwe
+  "Sikandar Raza",
+  // Netherlands
+  "A Dutt", "CN Ackermann", "Roelof van der Merwe", "Shariz Ahmad", "TJG Pringle",
+]);
+
+/** Left-arm bowlers, pace and spin (everyone else bowls right-arm). */
+export const LEFT_ARM_BOWLERS = new Set([
+  // India
+  "Abhishek Sharma", "Arshdeep Singh", "Axar Patel", "Jaydev Unadkat", "Kuldeep Yadav", "Pragyan Ojha", "Ravindra Jadeja",
+  "Shahbaz Ahmed", "Shahbaz Nadeem", "T Natarajan",
+  // Australia
+  "Ashton Agar", "Ben Dwarshuis", "Cooper Connolly", "D'Arcy Short", "Jason Behrendorff", "Joel Paris",
+  "Matthew Kuhnemann", "Mitchell Starc", "Spencer Johnson",
+  // England
+  "Jack Leach", "Jacob Bethell", "Liam Dawson", "Sam Curran", "Samit Patel", "Simon Kerrigan", "Tom Hartley", "Zafar Ansari",
+  // Pakistan
+  "Asif Afridi", "Imad Wasim", "Mir Hamza", "Mohammad Nawaz", "Noman Ali", "Shaheen Afridi", "Shaheen Shah Afridi",
+  "Usman Shinwari", "Zafar Gohar",
+  // New Zealand
+  "Ajaz Patel", "Mitchell Santner", "Rachin Ravindra", "Trent Boult",
+  // South Africa
+  "Beuran Hendricks", "George Linde", "Keshav Maharaj", "Kwena Maphaka", "Marco Jansen", "Nandre Burger",
+  "Senuran Muthusamy", "Tabraiz Shamsi",
+  // Sri Lanka
+  "Chaturanga de Silva", "Dilshan Madushanka", "Dunith Wellalage", "Embuldeniya", "Lakshan Sandakan",
+  "Milinda Siriwardana", "Prabath Jayasuriya", "Pushpakumara", "Rangana Herath", "Sachith Pathirana",
+  // Bangladesh
+  "Hasan Murad", "Mustafizur Rahman", "Nazmul Islam", "Shakib Al Hasan", "Shoriful Islam", "Sunzamul Islam",
+  // Afghanistan
+  "Fazalhaq Farooqi", "Noor Ahmad",
+  // Netherlands
+  "Roelof van der Merwe", "TJG Pringle",
+]);
+
 // Icon players — legendary all-time greats (ids 2000+)
 export const ICON_PLAYERS: Player[] = [
   { id: 2001, name: "Sachin Tendulkar",    role: "batsman",    country: "India",        battingRating: 970, bowlingRating: 300, keepingRating: 0, overallRating: 970, age: 51, salary: 0 },

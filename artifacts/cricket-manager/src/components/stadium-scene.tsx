@@ -1,5 +1,11 @@
 import { motion, animate as animateValue } from "framer-motion";
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { RiggedBatter, contactOffset, type BatterPlay, type BatterKit, type BatterStyle } from "@/components/drawn-batter";
+import { BatsmenAtWork, lastRunMadeAt, runningDoneAt, type BatterLook, type PitchEnds } from "@/components/batters-running";
+import { DrawnBowler, DrawnKeeper, keeperSpot, releasePoint, bowlerSide, type BowlerLook, type BowlerPlay, type FielderLook } from "@/components/drawn-fielders";
+
+/** The striker, drawn and animated in his country's style and kit. */
+export interface DrawnBatter { id: string; play: BatterPlay | null; ready: boolean; kit: BatterKit; style: BatterStyle; leftHanded: boolean }
 
 export type ShotDir = "leg" | "straight" | "off";
 
@@ -8,12 +14,11 @@ interface StadiumSceneProps {
   ballActive: boolean;
   batAngle: number;           // kept for compat
   shotDirection: ShotDir | null;
-  isUserBatting: boolean;
   resultFlash?: string | null;
-  kohliFrame?: number;        // 1–19, default 1 (stance)
-  batsmanSprite?: "kohli" | "root";  // which sprite to render
   ballPing?: boolean;         // ball bounced off bat
-  bowlerFrame?: number;       // 1–19 run-up frames
+  // The bowler (and his delivery) and the wicketkeeper
+  bowler?: { look: BowlerLook; play: BowlerPlay | null; userMode: boolean } | null;
+  keeper?: FielderLook | null;
   // Bowling aim mode
   bowlingMode?: boolean;
   pitchTarget?: { x: number; y: number } | null;   // 0-1 normalised within pitch
@@ -21,6 +26,9 @@ interface StadiumSceneProps {
   // Fielding animation after a hit
   fieldingAnim?: { runs: number; shotDir: ShotDir } | null;
   fieldingKey?: number;
+  // The striker, and the batter at the other end
+  drawnBatter?: DrawnBatter | null;
+  nonStriker?: BatterLook | null;
 }
 
 // ── World ───────────────────────────────────────────────────────────────────
@@ -45,18 +53,13 @@ const pitchHalfAt = (y: number) =>
   PITCH_HALF_TOP + (PITCH_HALF_BOTTOM - PITCH_HALF_TOP) * (y - PITCH_TOP) / (PITCH_BOTTOM - PITCH_TOP);
 
 const BATSMAN_X = 320, BATSMAN_Y = CREASE_BAT;  // feet at the crease
+// Both ends of the pitch, for the batters (things get a little bigger towards the bowler's end)
+export const ENDS: PitchEnds = {
+  x: BATSMAN_X, strikerY: CREASE_BAT, bowlerY: CREASE_BOWL,
+  perspective: (y: number) => pitchHalfAt(y) / pitchHalfAt(CREASE_BAT),
+};
 const BOWLER_X = 320, BOWLER_Y = 548;           // feet, at the end of the run-up
 export const BAT_X = 320, BAT_Y = BATSMAN_Y - 15;      // where bat meets ball
-// Keeper stands just to the off side of the batter so he isn't hidden behind the sprite
-export const KEEPER = { x: 343, y: 236 };
-
-// Sprites
-const B_W = 62, B_H = 88;
-const B_X = BOWLER_X - B_W / 2, B_Y = BOWLER_Y - B_H + 10;
-const K_W = 65, K_H = 92;
-const K_X = BATSMAN_X - K_W / 2, K_Y = BATSMAN_Y - K_H + 14;
-const R_W = 92, R_H = 128;
-const R_X = BATSMAN_X - R_W / 2, R_Y = BATSMAN_Y - R_H + 30;
 
 // Default camera: just bowler, keeper and batter in frame
 export const HOME_CAM = { x: 320, y: 380, s: 1.65 };
@@ -130,6 +133,23 @@ interface Plan {
   tPick: number; tThrow0: number; tThrow1: number; tEnd: number;
 }
 
+/**
+ * When the fielder gathers, throws and the ball comes back. With runs on, the throw comes in just as
+ * the batters make their ground on the last one (a long chase in the deep for two or three).
+ */
+function fieldTimes(r: number) {
+  const throwFor = r >= 2 ? 0.6 : 0.4;
+  const tPick = r > 0 ? Math.max(PICK_TIME[r], lastRunMadeAt(r) + 0.05 - 0.12 - throwFor) : PICK_TIME[r];
+  const tThrow0 = tPick + 0.12;
+  const tThrow1 = tThrow0 + throwFor;
+  return { tPick, tThrow0, tThrow1, tEnd: tThrow1 + 0.55 };
+}
+/** How long a fielded hit takes to play out (ms): the fielding and the batters' running. */
+export function fieldedPlayMs(runs: number) {
+  const r = Math.max(0, Math.min(3, runs));
+  return Math.max(2700, Math.round(Math.max(fieldTimes(r).tEnd, runningDoneAt(r)) * 1000) + 250);
+}
+
 function makePlan(runs: number, dir: ShotDir): Plan {
   const r = Math.max(0, Math.min(3, runs));
   const deg = randomShotAngle(dir);
@@ -143,10 +163,7 @@ function makePlan(runs: number, dir: ShotDir): Plan {
   const chaser = straight && r === 0
     ? null
     : pool.reduce((a, b) => Math.abs(b.deg - deg) < Math.abs(a.deg - deg) ? b : a);
-  const tPick = PICK_TIME[r];
-  const tThrow0 = tPick + 0.12;
-  const tThrow1 = tThrow0 + (r >= 2 ? 0.6 : 0.4);
-  const tEnd = tThrow1 + 0.55;                       // ≤ 2.5s, inside the match's 2.7s wait
+  const { tPick, tThrow0, tThrow1, tEnd } = fieldTimes(r);
   // The bowler lets a straight dot roll to his feet; a fielder attacks it while it's moving
   const roll = chaser ? ROLL_AT_PICK : 1;
   return { runs: r, dest, chaser, followScale: FOLLOW_SCALE[r], roll, tPick, tThrow0, tThrow1, tEnd };
@@ -250,10 +267,7 @@ export function FieldWorld({ idp, hideFielder }: { idp: string; hideFielder?: st
         </g>
       ))}
 
-      {/* Stumps — batter's end */}
-      {[313, 320, 327].map(x => <line key={x} x1={x} y1={STUMPS_BAT - 24} x2={x} y2={STUMPS_BAT} stroke="#ff6090" strokeWidth={3} />)}
-      <line x1={311} y1={STUMPS_BAT - 24} x2={329} y2={STUMPS_BAT - 24} stroke="#ff6090" strokeWidth={2} />
-      {/* Stumps — bowler's end */}
+      {/* Stumps — bowler's end (the batter's end are drawn over the keeper: see BattingStumps) */}
       {[314, 320, 326].map(x => <line key={x} x1={x} y1={STUMPS_BOWL - 22} x2={x} y2={STUMPS_BOWL} stroke="#ff6090" strokeWidth={3} />)}
       <line x1={312} y1={STUMPS_BOWL - 22} x2={328} y2={STUMPS_BOWL - 22} stroke="#ff6090" strokeWidth={2} />
 
@@ -264,74 +278,44 @@ export function FieldWorld({ idp, hideFielder }: { idp: string; hideFielder?: st
           <circle cx={f.x} cy={f.y} r={6.5} fill="white" opacity={0.95} />
         </g>
       ))}
-
-      {/* Keeper (behind the batter, so drawn before the batter sprite) */}
-      <ellipse cx={KEEPER.x} cy={KEEPER.y + 6} rx={7} ry={2.6} fill="rgba(0,0,0,0.35)" />
-      <circle cx={KEEPER.x} cy={KEEPER.y} r={6.5} fill="white" />
     </g>
   );
 }
 
-/** The striker: Kohli/Root sprite when the user bats, a generic figure when the CPU bats. */
-export function BatterFigure({ isUserBatting, batsmanSprite = "kohli", frame = 1 }: {
-  isUserBatting: boolean;
-  batsmanSprite?: "kohli" | "root";
-  frame?: number;
-}) {
-  if (isUserBatting) {
-    const root = batsmanSprite === "root";
-    return (
-      <image
-        href={root ? `/images/root/root-${frame}.png` : `/images/kohli/kohli-${frame}.png`}
-        x={root ? R_X : K_X} y={root ? R_Y : K_Y}
-        width={root ? R_W : K_W} height={root ? R_H : K_H}
-      />
-    );
-  }
+/** The stumps at the batter's end: in front of the keeper, behind the batter. */
+export function BattingStumps() {
   return (
-    <g transform={`translate(${BATSMAN_X}, ${BATSMAN_Y - 10}) scale(1.22)`}>
-      <rect x="-9" y="2" width="8" height="14" fill="#e2e8f0" rx="2" />
-      <rect x="2" y="2" width="8" height="14" fill="#e2e8f0" rx="2" />
-      <line x1="-4" y1="-2" x2="-6" y2="16" stroke="#1e3a8a" strokeWidth="5" strokeLinecap="round" />
-      <line x1="4" y1="-2" x2="7" y2="16" stroke="#1e3a8a" strokeWidth="5" strokeLinecap="round" />
-      <rect x="-7" y="-22" width="14" height="20" fill="#1e3a8a" rx="2" />
-      <line x1="7" y1="-18" x2="17" y2="-6" stroke="#1e3a8a" strokeWidth="5" strokeLinecap="round" />
-      <rect x="15" y="-14" width="7" height="22" fill="#c8a865" rx="2" transform="rotate(-20, 15, -14)" />
-      <line x1="-7" y1="-16" x2="-15" y2="-8" stroke="#1e3a8a" strokeWidth="4" strokeLinecap="round" />
-      <circle cx="0" cy="-34" r="10" fill="#172554" />
-      <path d="M -10,-34 Q -14,-28 -6,-26" fill="#172554" />
-      <line x1="-10" y1="-30" x2="-6" y2="-24" stroke="#64748b" strokeWidth="1.5" />
-      <line x1="-8" y1="-31" x2="-4" y2="-25" stroke="#64748b" strokeWidth="1.5" />
-      <circle cx="2" cy="-33" r="6" fill="#8B6914" />
+    <g>
+      {[313, 320, 327].map(x => <line key={x} x1={x} y1={STUMPS_BAT - 24} x2={x} y2={STUMPS_BAT} stroke="#ff6090" strokeWidth={3} />)}
+      <line x1={311} y1={STUMPS_BAT - 24} x2={329} y2={STUMPS_BAT - 24} stroke="#ff6090" strokeWidth={2} />
     </g>
   );
 }
 
-/** The bowler, on a run-up frame (1–19). */
-export function BowlerFigure({ frame = 1 }: { frame?: number }) {
+/** The striker at the crease (no one before the match starts). */
+export function BatterFigure({ drawn }: { drawn: DrawnBatter | null }) {
+  if (!drawn) return null;
   return (
-    <image
-      href={`/images/bowler/bowler-${frame}.png`}
-      x={B_X} y={B_Y} width={B_W} height={B_H}
-      preserveAspectRatio="xMidYMax meet"
-    />
+    <g transform={`translate(${BATSMAN_X}, ${BATSMAN_Y})`}>
+      <RiggedBatter key={drawn.id} play={drawn.play} ready={drawn.ready} kit={drawn.kit} leftHanded={drawn.leftHanded} style={drawn.style} />
+    </g>
   );
 }
 
 export function StadiumScene({
   ballActive,
   shotDirection,
-  isUserBatting,
   resultFlash,
-  kohliFrame = 1,
-  batsmanSprite = "kohli",
   ballPing = false,
-  bowlerFrame = 1,
+  bowler = null,
+  keeper = null,
   bowlingMode = false,
   pitchTarget = null,
   onPitchTarget,
   fieldingAnim,
   fieldingKey,
+  drawnBatter = null,
+  nonStriker = null,
 }: StadiumSceneProps) {
   const cameraGroupRef = useRef<SVGGElement>(null);
   const ballRef = useRef<SVGCircleElement>(null);
@@ -365,9 +349,33 @@ export function StadiumScene({
 
   const locked = pitchTarget ? pitchNormToWorld(pitchTarget.x, pitchTarget.y) : null;
 
+  // The delivery ends on the bat: a drawn batter's is wherever his shot meets it
+  const playShot = drawnBatter?.play?.shot;
+  const lefty = drawnBatter?.leftHanded ?? false;
+  const drawnStyle = drawnBatter?.style ?? "smith";
+  const deliveryEnd = useMemo(() => {
+    if (!playShot) return { cx: BATSMAN_X, cy: BAT_Y };
+    const o = contactOffset(playShot, lefty, drawnStyle);
+    return { cx: BATSMAN_X + o.x, cy: BATSMAN_Y + o.y };
+  }, [playShot, lefty, drawnStyle]);
+
   // One plan per hit (fixed random angle for that ball)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const plan = useMemo(() => (fieldingAnim ? makePlan(fieldingAnim.runs, fieldingAnim.shotDir) : null), [fieldingKey, fieldingAnim]);
+
+  // The keeper: up to the stumps for spin, back for pace, on the batter's off side. Throws come to him.
+  const standingUp = bowler?.look.kind === "spin";
+  const keeperPos = keeperSpot(standingUp, drawnBatter?.leftHanded ?? false, ENDS);
+  const keeperRef = useRef(keeperPos);
+  keeperRef.current = keeperPos;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const throwAt = useMemo(() => (plan ? performance.now() + plan.tThrow1 * 1000 : null), [plan]);
+  // The ball leaves the bowler's hand
+  const bowlerLook = bowler?.look;
+  const deliveryStart = useMemo(
+    () => (bowlerLook ? releasePoint(bowlerLook, ENDS) : { x: BOWLER_X + 8, y: BOWLER_Y - 62 }),
+    [bowlerLook?.kind, bowlerLook?.style, bowlerLook?.leftArm], // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   // Drive ball, fielder, throw and camera from one clock so the camera tracks the ball exactly
   useEffect(() => {
@@ -376,6 +384,7 @@ export function StadiumScene({
     if (!plan) { cam.setAttribute("transform", HOME_T); return; }
 
     const { dest, chaser, followScale, roll, tPick, tThrow0, tThrow1, tEnd } = plan;
+    const from = deliveryEnd;
     const midScale = (followScale + HOME_CAM.s) / 2;
     const easeOutQuad = (x: number) => 1 - (1 - x) * (1 - x);
     // The fielder carries on a stride past the pickup before throwing
@@ -392,7 +401,7 @@ export function StadiumScene({
     const apply = (t: number) => {
       // Ball runs out and slows down, still rolling when the fielder gets to it
       const e = easeOutQuad(roll * clamp01(t / tPick)) / easeOutQuad(roll);
-      const bx = lerp(BAT_X, dest.x, e), by = lerp(BAT_Y, dest.y, e);
+      const bx = lerp(from.cx, dest.x, e), by = lerp(from.cy, dest.y, e);
       place(ballRef.current, bx, by, t < tPick);
 
       // Fielder sets off at the hit, meets the ball at full pace, then jogs part of the way back
@@ -414,7 +423,8 @@ export function StadiumScene({
 
       // Throw back to the keeper
       const u = clamp01((t - tThrow0) / (tThrow1 - tThrow0));
-      place(throwRef.current, lerp(release.x, KEEPER.x, u), lerp(release.y, KEEPER.y, u), t >= tThrow0 && t <= tThrow1);
+      const K = keeperRef.current;
+      place(throwRef.current, lerp(release.x, K.x, u), lerp(release.y, K.y, u), t >= tThrow0 && t <= tThrow1);
 
       // Camera: chase the ball → hold on the pickup → follow the throw → settle back home
       let cx: number, cy: number, s: number;
@@ -427,10 +437,10 @@ export function StadiumScene({
         cx = lerp(dest.x, release.x, k); cy = lerp(dest.y, release.y, k); s = followScale;
       } else if (t < tThrow1) {
         const k = easeInOut(u);
-        cx = lerp(release.x, KEEPER.x, k); cy = lerp(release.y, KEEPER.y, k); s = lerp(followScale, midScale, k);
+        cx = lerp(release.x, K.x, k); cy = lerp(release.y, K.y, k); s = lerp(followScale, midScale, k);
       } else {
         const k = easeInOut(clamp01((t - tThrow1) / (tEnd - tThrow1)));
-        cx = lerp(KEEPER.x, HOME_CAM.x, k); cy = lerp(KEEPER.y, HOME_CAM.y, k); s = lerp(midScale, HOME_CAM.s, k);
+        cx = lerp(K.x, HOME_CAM.x, k); cy = lerp(K.y, HOME_CAM.y, k); s = lerp(midScale, HOME_CAM.s, k);
       }
       cam.setAttribute("transform", camTransform(cx, cy, s));
     };
@@ -438,7 +448,7 @@ export function StadiumScene({
     apply(0);
     const ctrl = animateValue(0, tEnd, { duration: tEnd, ease: "linear", onUpdate: apply });
     return () => { ctrl.stop(); cam.setAttribute("transform", HOME_T); };
-  }, [plan]);
+  }, [plan]); // eslint-disable-line react-hooks/exhaustive-deps -- start point is read once per hit
 
   // Little ball off the bat (plays under the boundary cutscene)
   const pingDX = shotDirection === "leg" ? -150 : shotDirection === "off" ? 150 : 0;
@@ -465,8 +475,13 @@ export function StadiumScene({
 
         <g ref={cameraGroupRef} transform={HOME_T}>
           <FieldWorld idp="ss" hideFielder={plan?.chaser?.id} />
-          <BatterFigure isUserBatting={isUserBatting} batsmanSprite={batsmanSprite} frame={kohliFrame} />
-          <BowlerFigure frame={bowlerFrame} />
+          {keeper && (
+            <DrawnKeeper look={keeper} spot={keeperPos} standingUp={standingUp} ends={ENDS}
+              bowlerKind={bowler?.look.kind ?? "pace"} play={bowler?.play ?? null} userMode={bowler?.userMode ?? false} throwAt={throwAt} />
+          )}
+          <BattingStumps />
+          <BatsmenAtWork striker={drawnBatter} nonStriker={nonStriker} ends={ENDS} bowlerSide={bowlerSide(bowler?.look.leftArm ?? false)} />
+          {bowler && <DrawnBowler look={bowler.look} play={bowler.play} ends={ENDS} userMode={bowler.userMode} />}
 
           {/* ── DELIVERY ── */}
           {ballActive && (
@@ -475,8 +490,8 @@ export function StadiumScene({
               fill="url(#ss-ballGlow)"
               stroke="#cc0000"
               strokeWidth={1}
-              initial={{ cx: BOWLER_X + 8, cy: BOWLER_Y - 62 }}
-              animate={{ cx: BATSMAN_X, cy: BAT_Y }}
+              initial={{ cx: deliveryStart.x, cy: deliveryStart.y }}
+              animate={deliveryEnd}
               transition={{ duration: 0.52, ease: "easeIn" }}
             />
           )}
@@ -498,7 +513,7 @@ export function StadiumScene({
           {plan && (
             <g key={fieldingKey}>
               {plan.chaser && <circle ref={chaserRef} cx={plan.chaser.x} cy={plan.chaser.y} r={6.5} fill="white" />}
-              <circle ref={ballRef} cx={BAT_X} cy={BAT_Y} r={4.5}
+              <circle ref={ballRef} cx={deliveryEnd.cx} cy={deliveryEnd.cy} r={4.5}
                 fill="#cc2200" stroke="#ff4444" strokeWidth={1.2}
                 style={{ filter: "drop-shadow(0 0 4px rgba(255,80,80,0.8))" }} />
               <circle ref={throwRef} cx={plan.dest.x} cy={plan.dest.y} r={3.8} opacity={0}
